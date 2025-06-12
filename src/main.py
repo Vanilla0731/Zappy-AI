@@ -46,7 +46,7 @@ class ZappyAI:
                 sys.exit(1)
             data = self.sock.recv(1024).decode('utf-8')
             if not data:
-                print("💔 Connection closed by the server.")
+                print("Connection closed by the server.")
                 sys.exit(0)
             self.buffer += data
         
@@ -84,7 +84,7 @@ class ZappyAI:
                 # --- IMPLEMENT AI LOGIC HERE ---
                 
             except KeyboardInterrupt:
-                print("\n👋 User interruption. Closing connection.")
+                print("\nUser interruption. Closing connection.")
                 break
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}", file=sys.stderr)
