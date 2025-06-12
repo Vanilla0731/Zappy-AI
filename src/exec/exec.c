@@ -5,12 +5,27 @@
 ** test
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/wait.h>
+#include "exec.h"
+
+static int copy_main_py(char **args)
+{
+    char *main_py = get_main_py_path();
+
+    if (!main_py) {
+        perror("get_main_py_path");
+        free(args[0]);
+        free(args[1]);
+        return 84;
+    }
+    args[2] = strdup(main_py);
+    if (!args[2]) {
+        perror("strdup");
+        free(args[0]);
+        free(args[1]);
+        return 84;
+    }
+    return 0;
+}
 
 static int build_inner_args(char **args)
 {
@@ -25,14 +40,7 @@ static int build_inner_args(char **args)
         free(args[0]);
         return 84;
     }
-    args[2] = strdup("src/main.py");
-    if (!args[2]) {
-        perror("strdup");
-        free(args[0]);
-        free(args[1]);
-        return 84;
-    }
-    return 0;
+    return copy_main_py(args);
 }
 
 static char **build_args(int ac, char **av)

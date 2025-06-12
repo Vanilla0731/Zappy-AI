@@ -22,10 +22,19 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 file(GLOB MAIN_SOURCE CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exec/exec.c")
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+    file(GLOB PATH_SOURCE CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/exec/get_macos_path.c")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    file(GLOB PATH_SOURCE CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/exec/get_linux_path.c")
+endif()
 
 add_executable(zappy_ai
     ${MAIN_SOURCE}
+    ${PATH_SOURCE}
 )
 
 target_compile_options(zappy_ai PRIVATE
@@ -85,6 +94,7 @@ file(GLOB TEST_SOURCE
 add_executable(zap_srv_unit_tests
     ${TEST_SOURCE}
     ${MAIN_SOURCE}
+    ${PATH_SOURCE}
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
