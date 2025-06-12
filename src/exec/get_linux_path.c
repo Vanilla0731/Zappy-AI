@@ -14,8 +14,8 @@ char *get_main_py_path(void)
     char exe_path[PATH_MAX];
     char real_exe_path[PATH_MAX];
     static char abs_path[PATH_MAX];
-
     ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+
     if (len == -1)
         return NULL;
     exe_path[len] = '\0';
