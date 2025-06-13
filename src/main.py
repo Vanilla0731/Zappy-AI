@@ -8,6 +8,22 @@
 import sys
 import argparse
 import socket
+import random
+
+# Constants for the AI client
+ELEVATION_REQUIREMENTS = {
+    1: (1, {"linemate": 1, "deraumere": 0, "sibur": 0, "mendiane": 0, "phiras": 0, "thystame": 0}),
+    2: (2, {"linemate": 1, "deraumere": 1, "sibur": 1, "mendiane": 0, "phiras": 0, "thystame": 0}),
+    3: (2, {"linemate": 2, "deraumere": 0, "sibur": 1, "mendiane": 0, "phiras": 2, "thystame": 0}),
+    4: (4, {"linemate": 1, "deraumere": 1, "sibur": 2, "mendiane": 0, "phiras": 1, "thystame": 0}),
+    5: (4, {"linemate": 1, "deraumere": 2, "sibur": 1, "mendiane": 3, "phiras": 0, "thystame": 0}),
+    6: (6, {"linemate": 1, "deraumere": 2, "sibur": 3, "mendiane": 0, "phiras": 1, "thystame": 0}),
+    7: (6, {"linemate": 2, "deraumere": 2, "sibur": 2, "mendiane": 2, "phiras": 2, "thystame": 1}),
+}
+
+FOOD_SURVIVAL_THRESHOLD = 20 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
+
+
 
 class ZappyAI:
     def __init__(self, host: str, port: int, team_name: str):
@@ -17,6 +33,17 @@ class ZappyAI:
         self.sock = None
         self.buffer = ""
 
+        # World and Player data
+        self.world_width = 0
+        self.world_height = 0
+        self.inventory = {}
+        self.level = 1
+        self.is_alive = True
+
+        self.vision = []
+
+        # Command Queue
+        self.command_queue = []
 
     def connect_to_server(self):
         """
@@ -55,7 +82,9 @@ class ZappyAI:
 
 
     def _initial_connection(self):
-        """Waits for 'WELCOME' and sends the team name."""
+        """
+        Waits for 'WELCOME' and sends the team name.
+        """
         welcome_message = self._read_from_server()
         if welcome_message != "WELCOME":
             print(f"Error: Expected 'WELCOME' from server, but got '{welcome_message}'", file=sys.stderr)
@@ -64,24 +93,129 @@ class ZappyAI:
         print(f"Server -> Me: {welcome_message}")
         
         print(f"Me -> Server: {self.team_name}")
+        self.send_command_immediately(f"{self.team_name}")
+        client_num_str = self._read_from_server()
+        if client_num_str == "ko":
+            print("Error: Team can't have more members.", file=sys.stderr)
+            sys.exit(84)
+        
+        world_size_str = self._read_from_server()
+        print(f"Server -> Me: {world_size_str}")
+        self.world_width, self.world_height = map(int, world_size_str.split())
+        print(f"World size: {self.world_width}x{self.world_height}")
+
+
+    def send_command_immediately(self, command: str):
+        """
+        Send a command without using the command queue (for initial connection).
+        """
         if self.sock is not None:
-            self.sock.sendall(f"{self.team_name}\n".encode('utf-8'))
+            self.sock.sendall(f"{command}\n".encode('utf-8'))
         else:
             print("Error: Socket is not connected.", file=sys.stderr)
             sys.exit(1)
 
 
+    def send_command(self, command: str):
+        """
+        Add a command to the command queue and send it to the server.
+        """
+        if len(self.command_queue) < 10:
+            print(f"Me -> Server: {command}")
+            self.send_command_immediately(command)
+            self.command_queue.append(command)
+            return True
+        else:
+            print("Warning: Command queue is full. Cannot send new command yet.")
+        return False
+
+
+    def handle_server_message(self, message: str):
+        """
+        Handle messages received from the server.
+        This method may be extended to handle different types of messages.
+        """
+        last_command = self.command_queue.pop(0) if self.command_queue else ""
+        if message == "ko":
+            print(f"Command '{last_command}' failed.")
+            return
+
+        if message == "dead":
+            self.is_alive = False
+            print("--- I DIED ---")
+            return
+
+        if message.startswith("Current level:"):
+            self.level = int(message.split(":")[1].strip())
+            print(f"--- LEVEL UP! Now level {self.level} ---")
+            # Reset the vision
+            self.vision = []
+
+        if last_command == "Inventory":
+            self._parse_inventory(message)
+        elif last_command == "Look":
+            self._parse_look(message)
+
+
+    def _parse_inventory(self, message: str):
+        """
+        Update the inventory from the server's answer.
+        """
+        message = message.strip('[] \n')
+        if not message:
+            return
+        try:
+            items = message.split(',')
+            for item in items:
+                name, quantity = item.strip().split()
+                self.inventory[name] = int(quantity)
+            print(f"Inventory updated: {self.inventory}")
+        except Exception as e:
+            print(f"Could not parse inventory: {message} ({e})")
+    
+
+    def _parse_look(self, message: str):
+        """
+        Update the vision from the server's answer.
+        """
+        message = message.strip('[] \n')
+        self.vision = [tile.strip() for tile in message.split(',')]
+        print(f"Vision updated. Seeing {len(self.vision)} tiles.")
+        print(f"On my tile (0): {self.vision[0] if self.vision else 'nothing'}")
+
+
+    def _check_elevation_requirements(self):
+        """
+        Check if the needed stones are available for the ritual.
+        Return the missing ones or a message if already at max level.
+        """
+        if self.level >= 8:
+            return {"status": "max_level"}
+
+        requirements = ELEVATION_REQUIREMENTS[self.level][1]
+        missing = {}
+        for stone, required_count in requirements.items():
+            if self.inventory.get(stone, 0) < required_count:
+                missing[stone] = required_count - self.inventory.get(stone, 0)
+        return missing
+
+
     def run(self):
-        """Main loop for the AI client."""
+        """
+        Main loop for the AI client.
+        """
         self.connect_to_server()
         self._initial_connection()
 
-        while True:
+        while self.is_alive:
             try:
+                if not self.command_queue:
+                    self._make_decision()
+
+                # Waiting for server answers
                 message = self._read_from_server()
                 print(f"Server -> Me: {message}")
-                
-                # --- IMPLEMENT AI LOGIC HERE ---
+                self.handle_server_message(message)
                 
             except KeyboardInterrupt:
                 print("\nUser interruption. Closing connection.")
@@ -93,6 +227,58 @@ class ZappyAI:
         if self.sock:
             self.sock.close()
             print("Socket closed.")
+    
+
+    def _make_decision(self):
+        """
+        Make decisions based on the current state of the AI.
+        This method should be implemented with the AI's logic.
+        """
+        # Priority 1: SURVIVAL
+        if self.inventory.get("food", 0) * 126 < FOOD_SURVIVAL_THRESHOLD:
+            print("Decision: Low on food, must find some to survive.")
+            # If there is food on the current tile, take it.
+            if self.vision and "food" in self.vision[0]:
+                self.send_command("Take food")
+            else:
+                self.send_command("Look")
+                # If no food is visible, move randomly to find some.
+                if self.vision:
+                    self.send_command(random.choice(["Forward", "Left", "Right"]))
+            return
+
+        # Priority 2: ELEVATION
+        needed_for_elevation = self._check_elevation_requirements()
+        if not needed_for_elevation:
+            print("Decision: I have all the stones for the next level. Preparing for incantation.")
+            # Setting stones on the tile
+            requirements = ELEVATION_REQUIREMENTS[self.level][1]
+            for stone, count in requirements.items():
+                if count > 0:
+                    for _ in range(count):
+                        self.send_command(f"Set {stone}")
+            # Starting the Incantation
+            self.send_command("Incantation")
+            return
+        else:
+            # Searching for the missing stones
+            print(f"Decision: Gathering stones for level {self.level + 1}. Missing: {needed_for_elevation}")
+            # If a needed stone is available on the current tile, take it.
+            if self.vision:
+                tile_content = self.vision[0].split()
+                for stone in needed_for_elevation:
+                    if stone in tile_content:
+                        self.send_command(f"Take {stone}")
+                        return
+        
+        # Priority 3: EXPLORATION
+        print("Decision: Exploring the world.")
+        self.send_command("Look") # "Look" before moving
+        self.send_command("Forward")
+        # A bit of random to not go only forward
+        if random.randint(0, 5) == 0:
+            self.send_command(random.choice(["Left", "Right"]))
+        
 
 def main():
     """
