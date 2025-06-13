@@ -21,7 +21,7 @@ ELEVATION_REQUIREMENTS = {
     7: (6, {"linemate": 2, "deraumere": 2, "sibur": 2, "mendiane": 2, "phiras": 2, "thystame": 1}),
 }
 
-FOOD_SURVIVAL_THRESHOLD = 20 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
+FOOD_SURVIVAL_THRESHOLD = 5 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
 
 
 
@@ -206,10 +206,12 @@ class ZappyAI:
         """
         self.connect_to_server()
         self._initial_connection()
+        self.send_command("Inventory")
 
         while self.is_alive:
             try:
                 if not self.command_queue:
+                    self.send_command("Inventory")
                     self._make_decision()
 
                 # Waiting for server answers
@@ -218,7 +220,7 @@ class ZappyAI:
                 self.handle_server_message(message)
                 
             except KeyboardInterrupt:
-                print("\nUser interruption. Closing connection.")
+                print("\rUser interruption. Closing connection.")
                 break
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}", file=sys.stderr)
@@ -241,43 +243,43 @@ class ZappyAI:
             if self.vision and "food" in self.vision[0]:
                 self.send_command("Take food")
             else:
-                self.send_command("Look")
                 # If no food is visible, move randomly to find some.
-                if self.vision:
-                    self.send_command(random.choice(["Forward", "Left", "Right"]))
+                self.send_command(random.choice(["Forward", "Left", "Right"]))
             return
 
         # Priority 2: ELEVATION
         needed_for_elevation = self._check_elevation_requirements()
         if not needed_for_elevation:
-            print("Decision: I have all the stones for the next level. Preparing for incantation.")
+            print("Decision: I have all stones for the next level. Preparing for incantation.")
             # Setting stones on the tile
             requirements = ELEVATION_REQUIREMENTS[self.level][1]
             for stone, count in requirements.items():
                 if count > 0:
                     for _ in range(count):
                         self.send_command(f"Set {stone}")
-            # Starting the Incantation
+            #Starting the Incantation
             self.send_command("Incantation")
             return
+
+        # Priority 3: GATHERING
+        if self.vision:
+            tile_content = self.vision[0].split()
+            for stone in needed_for_elevation:
+                if stone in tile_content:
+                    print(f"Decision: Found a needed stone ({stone}) on my tile. Taking it.")
+                    self.send_command(f"Take {stone}")
+                    return
+
+        # Priority 4: EXPLORATION
+        print("Decision: Exploring the world to find resources.")
+        if not self.vision:
+            self.send_command("Look")  # "Look" before moving
         else:
-            # Searching for the missing stones
-            print(f"Decision: Gathering stones for level {self.level + 1}. Missing: {needed_for_elevation}")
-            # If a needed stone is available on the current tile, take it.
-            if self.vision:
-                tile_content = self.vision[0].split()
-                for stone in needed_for_elevation:
-                    if stone in tile_content:
-                        self.send_command(f"Take {stone}")
-                        return
-        
-        # Priority 3: EXPLORATION
-        print("Decision: Exploring the world.")
-        self.send_command("Look") # "Look" before moving
-        self.send_command("Forward")
-        # A bit of random to not go only forward
-        if random.randint(0, 5) == 0:
-            self.send_command(random.choice(["Left", "Right"]))
+            self.send_command("Forward")
+            # A bit of random to not go only forward
+            if random.randint(0, 5) == 0:
+                self.send_command(random.choice(["Left", "Right"]))
+            self.vision = []
         
 
 def main():
