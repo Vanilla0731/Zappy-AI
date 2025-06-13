@@ -100,7 +100,7 @@ int main(int ac, char **av)
 {
     __attribute__((cleanup(free_args)))char **args = build_args(ac, av);
 
-    if (!args || exec_python(args) == 84) {
+    if (!args || exec_python(args) != 0) {
         return 84;
     }
     return 0;
