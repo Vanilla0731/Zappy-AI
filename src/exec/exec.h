@@ -17,6 +17,7 @@
     #include <unistd.h>
     #include <sys/wait.h>
 
+void free_args(char ***args);
 char *get_main_py_path(void);
 
 #endif /* !EXEC_H_ */

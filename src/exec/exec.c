@@ -86,18 +86,22 @@ static int exec_python(char **args)
     return 84;
 }
 
+void free_args(char ***args)
+{
+    for (int i = 0; i < 3; ++i) {
+        free((*args)[i]);
+        (*args)[i] = NULL;
+    }
+    free(*args);
+    *args = NULL;
+}
+
 int main(int ac, char **av)
 {
-    int ret;
-    char **args = build_args(ac, av);
+    __attribute__((cleanup(free_args)))char **args = build_args(ac, av);
 
-    if (!args) {
+    if (!args || exec_python(args) != 0) {
         return 84;
     }
-    ret = exec_python(args);
-    for (int i = 0; i < 3; ++i) {
-        free(args[i]);
-    }
-    free(args);
-    return ret == 0 ? 0 : 84;
+    return 0;
 }
