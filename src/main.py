@@ -24,7 +24,6 @@ ELEVATION_REQUIREMENTS = {
 FOOD_SURVIVAL_THRESHOLD = 5 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
 
 
-
 class ZappyAI:
     def __init__(self, host: str, port: int, team_name: str):
         self.host = host
@@ -39,11 +38,11 @@ class ZappyAI:
         self.inventory = {}
         self.level = 1
         self.is_alive = True
-
         self.vision = []
 
         # Command Queue
         self.command_queue = []
+        self.action_plan = []
 
     def connect_to_server(self):
         """
@@ -91,7 +90,6 @@ class ZappyAI:
             sys.exit(84)
         
         print(f"Server -> Me: {welcome_message}")
-        
         print(f"Me -> Server: {self.team_name}")
         self.send_command_immediately(f"{self.team_name}")
         client_num_str = self._read_from_server()
@@ -162,13 +160,16 @@ class ZappyAI:
         Update the inventory from the server's answer.
         """
         message = message.strip('[] \n')
+        new_inventory = {}
         if not message:
+            self.inventory = new_inventory # Empty Inventory case
             return
         try:
             items = message.split(',')
             for item in items:
                 name, quantity = item.strip().split()
                 self.inventory[name] = int(quantity)
+            self.inventory = new_inventory # Replace the old inventory by the new one
             print(f"Inventory updated: {self.inventory}")
         except Exception as e:
             print(f"Could not parse inventory: {message} ({e})")
@@ -200,6 +201,55 @@ class ZappyAI:
         return missing
 
 
+    def _find_closest_ressource(self, ressource_name: str) -> int:
+        """
+        Find the closest tile in vision containing the specifies ressource.
+        Returns the tile index, or -1 if not found.
+        """
+        if not self.vision:
+            return -1
+        for i, tile_content in enumerate(self.vision):
+            if ressource_name in tile_content:
+                return i
+        return -1
+    
+
+    def _get_path_to_tile(self, tile_index: int):
+        """
+        Find the path to a tile and generate the sequence of commands to move to it.
+        """
+        if tile_index <= 0:
+            return []
+        
+        path = []
+        level = 0
+        tiles_in_level = 1
+        # Calculate the depth of the tile
+        while tile_index >= tiles_in_level:
+            tile_index -= tiles_in_level
+            level += 1
+            tiles_in_level = 2 * level + 1
+        # Now tile_index is the index in the current level
+
+        # 1. Move to the correct level
+        path.extend(["Forward"] * level)
+
+        # 2. Move to the correct tile in the level
+        center_of_level = level
+        if tile_index < center_of_level:
+            path.append("Left")
+            # Move to the left side of the level
+            path.extend(["Forward"] * (center_of_level - tile_index))
+        elif tile_index > center_of_level:
+            path.append("Right")
+            # Move to the right side of the level
+            path.extend(["Forward"] * (tile_index - center_of_level))
+        else:
+            # Already at the center of the level
+            pass
+        return path
+    
+
     def run(self):
         """
         Main loop for the AI client.
@@ -210,9 +260,13 @@ class ZappyAI:
 
         while self.is_alive:
             try:
-                if not self.command_queue:
+                if not self.command_queue and not self.action_plan:
                     self.send_command("Inventory")
                     self._make_decision()
+
+                if self.action_plan:
+                    next_action = self.action_plan.pop(0)
+                    self.send_command(next_action)
 
                 # Waiting for server answers
                 message = self._read_from_server()
@@ -236,15 +290,28 @@ class ZappyAI:
         Make decisions based on the current state of the AI.
         This method should be implemented with the AI's logic.
         """
+        # Priority 0: Update vision
+        if not self.vision:
+            self.send_command("Look")
+            return
+
         # Priority 1: SURVIVAL
         if self.inventory.get("food", 0) * 126 < FOOD_SURVIVAL_THRESHOLD:
             print("Decision: Low on food, must find some to survive.")
+            food_tile_index = self._find_closest_ressource("food")
+
             # If there is food on the current tile, take it.
-            if self.vision and "food" in self.vision[0]:
+            if food_tile_index == 0:
                 self.send_command("Take food")
+            elif food_tile_index > 0:
+                # If food is visible on another tile, move towards it.
+                print(f"Decision: Found food on tile {food_tile_index}. Moving towards it.")
+                self.action_plan = self._get_path_to_tile(food_tile_index)
+                self.action_plan.append("Take food")
             else:
                 # If no food is visible, move randomly to find some.
                 self.send_command(random.choice(["Forward", "Left", "Right"]))
+            self.vision = []  # Vision would be invalid after moving
             return
 
         # Priority 2: ELEVATION
@@ -256,30 +323,41 @@ class ZappyAI:
             for stone, count in requirements.items():
                 if count > 0:
                     for _ in range(count):
-                        self.send_command(f"Set {stone}")
+                        self.action_plan.append(f"Set {stone}")
             #Starting the Incantation
-            self.send_command("Incantation")
+            self.action_plan.append("Incantation")
             return
 
         # Priority 3: GATHERING
-        if self.vision:
-            tile_content = self.vision[0].split()
-            for stone in needed_for_elevation:
-                if stone in tile_content:
-                    print(f"Decision: Found a needed stone ({stone}) on my tile. Taking it.")
-                    self.send_command(f"Take {stone}")
-                    return
+        closest_stone = {"stone": None, "tile_index": -1}
+        for stone in needed_for_elevation:
+            tile_index = self._find_closest_ressource(stone)
+            if tile_index != -1:
+                # First stone found or closest one
+                if closest_stone["tile_index"] == -1 or tile_index < closest_stone["tile_index"]:
+                    closest_stone["stone"] = stone
+                    closest_stone["tile_index"] = tile_index
+        
+        if closest_stone["stone"]:
+            stone_to_get = closest_stone["stone"]
+            tile_to_go = closest_stone["tile_index"]
+            print(f"Decision: Found {stone_to_get} on tile {tile_to_go}. Moving towards it.")
+            if tile_to_go == 0:
+                self.send_command(f"Take {stone_to_get}")
+            else:
+                self.action_plan = self._get_path_to_tile(tile_to_go)
+                self.action_plan.append(f"Take {stone_to_get}")
+        
+            self.vision = []  # Vision would be invalid after moving
+            return
 
         # Priority 4: EXPLORATION
         print("Decision: Exploring the world to find resources.")
-        if not self.vision:
-            self.send_command("Look")  # "Look" before moving
-        else:
-            self.send_command("Forward")
-            # A bit of random to not go only forward
-            if random.randint(0, 5) == 0:
-                self.send_command(random.choice(["Left", "Right"]))
-            self.vision = []
+        self.send_command("Forward")
+        # A bit of random to not go only forward
+        if random.randint(0, 5) == 0:
+            self.send_command(random.choice(["Left", "Right"]))
+        self.vision = []
         
 
 def main():
