@@ -133,6 +133,16 @@ class ZappyAI:
         Handle messages received from the server.
         This method may be extended to handle different types of messages.
         """
+
+        if message.startswith("Current level:"):
+            self.level = int(message.split(":")[1].strip())
+            print(f"--- LEVEL UP! Now level {self.level} ---")
+            self.vision = [] # Reset the vision
+            return
+
+        if message == "Elevation underway":
+            return
+
         last_command = self.command_queue.pop(0) if self.command_queue else ""
         if message == "ko":
             print(f"Command '{last_command}' failed.")
@@ -142,12 +152,6 @@ class ZappyAI:
             self.is_alive = False
             print("--- I DIED ---")
             return
-
-        if message.startswith("Current level:"):
-            self.level = int(message.split(":")[1].strip())
-            print(f"--- LEVEL UP! Now level {self.level} ---")
-            # Reset the vision
-            self.vision = []
 
         if last_command == "Inventory":
             self._parse_inventory(message)
