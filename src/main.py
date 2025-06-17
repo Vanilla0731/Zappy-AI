@@ -9,6 +9,8 @@ import sys
 import argparse
 import socket
 import random
+import threading
+from _thread import *
 
 # Constants for the AI client
 ELEVATION_REQUIREMENTS = {
@@ -75,7 +77,7 @@ class ZappyAI:
                 print("Connection closed by the server.")
                 sys.exit(0)
             self.buffer += data
-        
+
         line, self.buffer = self.buffer.split("\n", 1)
         return line
 
@@ -88,7 +90,7 @@ class ZappyAI:
         if welcome_message != "WELCOME":
             print(f"Error: Expected 'WELCOME' from server, but got '{welcome_message}'", file=sys.stderr)
             sys.exit(84)
-        
+
         print(f"Server -> Me: {welcome_message}")
         print(f"Me -> Server: {self.team_name}")
         self.send_command_immediately(f"{self.team_name}")
@@ -96,7 +98,7 @@ class ZappyAI:
         if client_num_str == "ko":
             print("Error: Team can't have more members.", file=sys.stderr)
             sys.exit(84)
-        
+
         world_size_str = self._read_from_server()
         print(f"Server -> Me: {world_size_str}")
         self.world_width, self.world_height = map(int, world_size_str.split())
@@ -177,7 +179,7 @@ class ZappyAI:
             print(f"Inventory updated: {self.inventory}")
         except Exception as e:
             print(f"Could not parse inventory: {message} ({e})")
-    
+
 
     def _parse_look(self, message: str):
         """
@@ -216,7 +218,7 @@ class ZappyAI:
             if ressource_name in tile_content:
                 return i
         return -1
-    
+
 
     def _get_path_to_tile(self, tile_index: int):
         """
@@ -224,7 +226,7 @@ class ZappyAI:
         """
         if tile_index <= 0:
             return []
-        
+
         path = []
         level = 0
         tiles_in_level = 1
@@ -252,13 +254,31 @@ class ZappyAI:
             # Already at the center of the level
             pass
         return path
-    
+
+    # Listening function
+
+    # def listening_thread(self, thread_client):
+
+
+    #     while (True):
+    #         data_server = thread_client.recv()
+    #         if not data_server:
+    #             continue
+    #         print(data_server)
+    #     thread_client.close()
 
     def run(self):
         """
         Main loop for the AI client.
         """
+
         self.connect_to_server()
+
+        # Tentative de listening function
+
+        # thread_client, addr = self.sock.accept()
+        # start_new_thread(listening_thread, (thread_client,))
+
         self._initial_connection()
         self.send_command("Inventory")
 
@@ -276,18 +296,18 @@ class ZappyAI:
                 message = self._read_from_server()
                 print(f"Server -> Me: {message}")
                 self.handle_server_message(message)
-                
+
             except KeyboardInterrupt:
                 print("\rUser interruption. Closing connection.")
                 break
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}", file=sys.stderr)
                 break
-        
+
         if self.sock:
             self.sock.close()
             print("Socket closed.")
-    
+
 
     def _make_decision(self):
         """
@@ -341,7 +361,7 @@ class ZappyAI:
                 if closest_stone["tile_index"] == -1 or tile_index < closest_stone["tile_index"]:
                     closest_stone["stone"] = stone
                     closest_stone["tile_index"] = tile_index
-        
+
         if closest_stone["stone"]:
             stone_to_get = closest_stone["stone"]
             tile_to_go = closest_stone["tile_index"]
@@ -351,7 +371,7 @@ class ZappyAI:
             else:
                 self.action_plan = self._get_path_to_tile(tile_to_go)
                 self.action_plan.append(f"Take {stone_to_get}")
-        
+
             self.vision = []  # Vision would be invalid after moving
             return
 
@@ -362,7 +382,7 @@ class ZappyAI:
         if random.randint(0, 5) == 0:
             self.send_command(random.choice(["Left", "Right"]))
         self.vision = []
-        
+
 
 def main():
     """
