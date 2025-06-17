@@ -21,7 +21,7 @@ ELEVATION_REQUIREMENTS = {
     7: (6, {"linemate": 2, "deraumere": 2, "sibur": 2, "mendiane": 2, "phiras": 2, "thystame": 1}),
 }
 
-FOOD_SURVIVAL_THRESHOLD = 5 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
+FOOD_SURVIVAL_THRESHOLD = 8 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
 
 
 class ZappyAI:
@@ -31,6 +31,7 @@ class ZappyAI:
         self.team_name = team_name
         self.sock = None
         self.buffer = ""
+        self.is_responding_to_broadcast = False
 
         # World and Player data
         self.world_width = 0
@@ -133,30 +134,63 @@ class ZappyAI:
         Handle messages received from the server.
         This method may be extended to handle different types of messages.
         """
+        # Holding of every non-solicited messages
 
+        if message.startswith("message"):
+            self._handle_broadcast(message)
+            return
+
+        # "Elevation underway" is a notification, we must ignore it
+        if message == "Elevation underway":
+            print(f"INFO: An elevation ritual is underway on the tile.")
+            return
+
+        # "Current level: n" is the result of an incantation.
         if message.startswith("Current level:"):
+            try:
+                incantation_index = self.command_queue.index("Incantation")
+                del self.command_queue[:incantation_index + 1]  # Remove the incantation command and its dependencies
+            except ValueError:
+                pass  # In case "Incantation" is not in the queue, we ignore it
+
             self.level = int(message.split(":")[1].strip())
             print(f"--- LEVEL UP! Now level {self.level} ---")
             self.vision = [] # Reset the vision
+            self.is_responding_to_broadcast = False
+            self.action_plan = []  # Clear the action plan
             return
 
-        if message == "Elevation underway":
-            return
-
-        last_command = self.command_queue.pop(0) if self.command_queue else ""
-        if message == "ko":
-            print(f"Command '{last_command}' failed.")
-            return
-
+        # Fatal notification
         if message == "dead":
             self.is_alive = False
             print("--- I DIED ---")
             return
 
+        # Handling of answers to commands
+
+        if not self.command_queue:
+            print(f"Warning: Received message '{message}' without any command in the queue. Ignoring.")
+            return
+        
+        last_command = self.command_queue.pop(0)
+
+        # If the command failed, cancel the action plan
+        if message == "ko":
+            print(f"Command '{last_command}' failed.")
+            self.action_plan = []
+            return
+
+        # If the command was successful, no need for a specific treatment
+        if message == "ok":
+            return
+
+        # If the command was "Inventory" or "Look", we parse the message
         if last_command == "Inventory":
             self._parse_inventory(message)
         elif last_command == "Look":
             self._parse_look(message)
+        else: # Weird case where we receive an unexpected answer for a known command. This should not happen.
+            print(f"WARNING: Received unexpected answer '{message}' for command '{last_command}'.")
 
 
     def _parse_inventory(self, message: str):
@@ -166,14 +200,15 @@ class ZappyAI:
         message = message.strip('[] \n')
         new_inventory = {}
         if not message:
-            self.inventory = new_inventory # Empty Inventory case
+            self.inventory = new_inventory # Empty inventory case
             return
         try:
             items = message.split(',')
             for item in items:
                 name, quantity = item.strip().split()
-                self.inventory[name] = int(quantity)
-            self.inventory = new_inventory # Replace the old inventory by the new one
+                new_inventory[name] = int(quantity)
+            # Assign the new inventory
+            self.inventory = new_inventory 
             print(f"Inventory updated: {self.inventory}")
         except Exception as e:
             print(f"Could not parse inventory: {message} ({e})")
@@ -254,6 +289,66 @@ class ZappyAI:
         return path
     
 
+    def _get_path_from_direction(self, direction: int):
+        """
+        Generate a sequence of commands to move towards the source of a sound.
+        The direction indicates the tile from which the sound is coming.
+        """
+        if direction == 0: # Sound is coming from the current tile
+            return []
+
+        # Mapping of directions to movement commands
+        # 1: Forward, 3: Left, 5: Behind, 7: Right
+        paths = {
+            1: ["Forward"],
+            2: ["Forward", "Left", "Forward"],
+            3: ["Left", "Forward"],
+            4: ["Left", "Forward", "Left", "Forward"],
+            5: ["Left", "Left", "Forward"],
+            6: ["Right", "Forward", "Right", "Forward"],
+            7: ["Right", "Forward"],
+            8: ["Forward", "Right", "Forward"],
+        }
+        return paths.get(direction, [])
+    
+
+    def _handle_broadcast(self, message: str):
+        """
+        Parses and reacts to a broadcast message from another player.
+        Exemple de message du serveur: "message 2, NOM_EQUIPE:incantation:4"
+        """
+        print(f"Broadcast received: {message}")
+        try:
+            # Format: "message K, text"
+            direction_str, content = message.replace("message ", "").split(",", 1)
+            direction = int(direction_str)
+            content = content.strip()
+        except ValueError:
+            print(f"Could not parse broadcast: {message}")
+            return
+
+        # 1. Ignore the message if it comes from ourselves or if it is coming from the current tile (direction 0)
+        if direction == 0 or self.is_responding_to_broadcast:
+            return
+
+        # 2. Parse the content of the message
+        # Format: TEAM_NAME:purpose:level
+        try:
+            team_name, purpose, level_str = content.split(":")
+            required_level = int(level_str)
+        except (ValueError, IndexError):
+            # Ignore messages with invalid format
+            return
+
+        # 3. Check if the message is relevant to us
+        if team_name == self.team_name and purpose == "Incantation" and self.level == required_level:
+            print(f"Decision: Responding to incantation call for level {required_level} from direction {direction}.")
+            self.is_responding_to_broadcast = True
+            self.action_plan = self._get_path_from_direction(direction)
+            # Look around to see if we can help
+            self.action_plan.append("Look")
+
+
     def run(self):
         """
         Main loop for the AI client.
@@ -264,11 +359,12 @@ class ZappyAI:
 
         while self.is_alive:
             try:
-                if not self.command_queue and not self.action_plan:
-                    self.send_command("Inventory")
-                    self._make_decision()
+                if not self.command_queue:
+                    if not self.action_plan:
+                        self.send_command("Inventory")
+                        self._make_decision()
 
-                if self.action_plan:
+                while self.action_plan and len(self.command_queue) < 10:
                     next_action = self.action_plan.pop(0)
                     self.send_command(next_action)
 
@@ -294,6 +390,12 @@ class ZappyAI:
         Make decisions based on the current state of the AI.
         This method should be implemented with the AI's logic.
         """
+        # If answering to a broadcast, we only follow the broadcast
+        if self.is_responding_to_broadcast and not self.action_plan:
+            self.is_responding_to_broadcast = False
+            self.send_command("Look")
+            return
+
         # Priority 0: Update vision
         if not self.vision:
             self.send_command("Look")
@@ -302,6 +404,7 @@ class ZappyAI:
         # Priority 1: SURVIVAL
         if self.inventory.get("food", 0) * 126 < FOOD_SURVIVAL_THRESHOLD:
             print("Decision: Low on food, must find some to survive.")
+            self.is_responding_to_broadcast = False
             food_tile_index = self._find_closest_ressource("food")
 
             # If there is food on the current tile, take it.
@@ -321,15 +424,31 @@ class ZappyAI:
         # Priority 2: ELEVATION
         needed_for_elevation = self._check_elevation_requirements()
         if not needed_for_elevation:
-            print("Decision: I have all stones for the next level. Preparing for incantation.")
-            # Setting stones on the tile
-            requirements = ELEVATION_REQUIREMENTS[self.level][1]
-            for stone, count in requirements.items():
-                if count > 0:
-                    for _ in range(count):
-                        self.action_plan.append(f"Set {stone}")
-            #Starting the Incantation
-            self.action_plan.append("Incantation")
+            if self.inventory.get("food", 0) * 126 < 300 + (2 * 126): # 300 time units for incantation + 2 * 126 for the next level
+                print("Decision: Ready for elevation, but need food first to survive the ritual.")
+                self.send_command("Look")
+                return
+
+            players_needed = ELEVATION_REQUIREMENTS[self.level][0]
+            players_on_tile = self.vision[0].count("player") + 1 # +1 for self
+
+            if players_on_tile >= players_needed:
+                print("Decision: I have all stones and enough players for the next level. Preparing for incantation.")
+                self.is_responding_to_broadcast = False
+                # Setting stones on the tile
+                requirements = ELEVATION_REQUIREMENTS[self.level][1]
+                for stone, count in requirements.items():
+                    if count > 0:
+                        for _ in range(count):
+                            self.action_plan.append(f"Set {stone}")
+                #Starting the Incantation
+                self.action_plan.append("Incantation")
+            else:
+                print(f"Decision: Waiting for {players_needed - players_on_tile} more players to start incantation.")
+                message = f"{self.team_name}:Incantation:{self.level}"
+                self.send_command(f"Broadcast {message}")
+                # Looking around while waiting for more players
+                self.send_command("Look")
             return
 
         # Priority 3: GATHERING
