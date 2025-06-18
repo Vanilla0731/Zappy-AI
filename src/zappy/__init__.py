@@ -1,3 +1,20 @@
+##
+## EPITECH PROJECT, 2025
+## Zappy-AI
+## File description:
+## __init__
+##
+
+import logging
+from .color_formatter import ColorFormatter
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+formatter = ColorFormatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
 # Constants for the AI client
 ELEVATION_REQUIREMENTS = {
     1: (1, {"linemate": 1, "deraumere": 0, "sibur": 0, "mendiane": 0, "phiras": 0, "thystame": 0}),

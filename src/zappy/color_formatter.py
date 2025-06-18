@@ -1,0 +1,29 @@
+##
+## EPITECH PROJECT, 2025
+## Zappy-AI
+## File description:
+## color_formatter
+##
+
+import logging
+
+RESET = "\x1b[0m"
+BLUE = "\x1b[34m"
+GREEN = "\x1b[32m"
+YELLOW = "\x1b[33m"
+RED = "\x1b[31m"
+BOLD_RED = "\x1b[1;31m"
+
+COLORS = {
+    'DEBUG': BLUE,
+    'INFO': GREEN,
+    'WARNING': YELLOW,
+    'ERROR': RED,
+    'CRITICAL': BOLD_RED
+}
+
+class ColorFormatter(logging.Formatter):
+    def format(self, record):
+        log_message = super().format(record)
+        color = COLORS.get(record.levelname, RESET)
+        return f"{color}{log_message}{RESET}"

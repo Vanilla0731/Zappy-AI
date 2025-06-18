@@ -5,9 +5,13 @@
 ## main
 ##
 
-import sys
 import argparse
+from zappy import logger
 from zappy.ai import ZappyAI
+from zappy.exception import ZappyError
+
+ZAPPY_AI_ERROR = 84
+ZAPPY_AI_SUCCESS = 0
 
 def main():
     """
@@ -20,14 +24,14 @@ def main():
 
     args = parser.parse_args()
 
+    success = False
     try:
         ai_client = ZappyAI(host=args.host, port=args.port, team_name=args.name)
-        ai_client.run()
-    except SystemExit as e:
-        sys.exit(e.code)
-    except Exception as e:
-        print(f"A critical error occurred: {e}", file=sys.stderr)
-        sys.exit(84)
+        success = ai_client.run()
+    except ZappyError as e:
+        logger.error(f"An error occurred at: {e.where}: {e.what}")
+        success = False
+    exit(ZAPPY_AI_SUCCESS if success else ZAPPY_AI_ERROR)
 
 if __name__ == "__main__":
     main()

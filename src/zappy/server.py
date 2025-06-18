@@ -7,8 +7,10 @@
 
 import sys
 import socket
+from . import logger
 from typing import Any
 from .player import PlayerState
+from .exception import ZappyError
 from .parsing import parse_inventory, parse_look
 
 class ZappyServer:
@@ -42,45 +44,42 @@ class ZappyServer:
         }
         return paths.get(direction, [])
 
-    def initial_connection(self, state: PlayerState):
+    def initial_connection(self, team_name: str) -> tuple[int, int]:
         """
         Waits for 'WELCOME' and sends the team name.
         """
         welcome_message = self.read_from_server()
         if welcome_message != "WELCOME":
-            print(f"Error: Expected 'WELCOME' from server, but got '{welcome_message}'", file=sys.stderr)
-            sys.exit(84)
+            raise ZappyError("initial_connection", f"Expected 'WELCOME' from server, but got '{welcome_message}'.")
 
-        print(f"Server -> Me: {welcome_message}")
-        print(f"Me -> Server: {state.get_team_name()}")
-        self.send_command_immediately(f"{state.get_team_name()}")
+        logger.debug(f"Server -> Me: {welcome_message}")
+        logger.debug(f"Me -> Server: {team_name}")
+        self.send_command_immediately(f"{team_name}")
+
         client_num_str = self.read_from_server()
         if client_num_str == "ko":
-            print("Error: Team can't have more members.", file=sys.stderr)
-            sys.exit(84)
+            raise ZappyError("initial_connection", "Team can't have more members")
 
         world_size_str = self.read_from_server()
-        print(f"Server -> Me: {world_size_str}")
+        logger.debug(f"Server -> Me: {world_size_str}")
         width, heigth = map(int, world_size_str.split())
-        state.set_world_size(width, heigth)
-        print(f"World size: {state.get_world_height()}x{state.get_world_height()}")
+        logger.info(f"World size: {width}x{heigth}")
+        return width, heigth
 
     def connect_to_server(self):
         """
         Create the socket(s) and connect to the Zappy server.
         """
-        print(f"Trying to connect to Zappy server at {self.host}:{self.port}...")
+        logger.info(f"Trying to connect to Zappy server at {self.host}:{self.port}...")
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.connect((self.host, self.port))
-            print("Connection established with Zappy server.")
+            logger.info("Connection established with Zappy server.")
 
         except ConnectionRefusedError:
-            print(f"Error: Connection denied.", file=sys.stderr)
-            sys.exit(1)
+            raise ZappyError("connect_to_server", "Connection denied.")
         except socket.timeout:
-            print("Error: No response from the server (timeout).", file=sys.stderr)
-            sys.exit(1)
+            raise ZappyError("connect_to_server", "No response from the server (timeout).")
 
     def read_from_server(self):
         """
@@ -88,11 +87,10 @@ class ZappyServer:
         """
         while "\n" not in self.buffer:
             if self.sock is None:
-                print("Error: Socket is not connected.", file=sys.stderr)
-                sys.exit(1)
+                raise ZappyError("read_from_server", "Socket is not connected.")
             data = self.sock.recv(1024).decode('utf-8')
             if not data:
-                print("Connection closed by the server.")
+                logger.info("Connection closed by the server.")
                 sys.exit(0)
             self.buffer += data
 
@@ -104,14 +102,14 @@ class ZappyServer:
         Parses and reacts to a broadcast message from another player.
         Exemple de message du serveur: "message 2, NOM_EQUIPE:incantation:4"
         """
-        print(f"Broadcast received: {message}")
+        logger.info(f"Broadcast received: {message}")
         try:
             # Format: "message K, text"
             direction_str, content = message.replace("message ", "").split(",", 1)
             direction = int(direction_str)
             content = content.strip()
         except ValueError:
-            print(f"Could not parse broadcast: {message}")
+            logger.warning(f"Could not parse broadcast: {message}")
             return
 
         # 1. Ignore the message if it comes from ourselves or if it is coming from the current tile (direction 0)
@@ -125,11 +123,12 @@ class ZappyServer:
             required_level = int(level_str)
         except (ValueError, IndexError):
             # Ignore messages with invalid format
+            logger.warning(f"Could not parse broadcast: {message}")
             return
 
         # 3. Check if the message is relevant to us
         if team_name == state.team_name and purpose == "Incantation" and state.level == required_level:
-            print(f"Decision: Responding to incantation call for level {required_level} from direction {direction}.")
+            logger.debug(f"Decision: Responding to incantation call for level {required_level} from direction {direction}.")
             state.is_responding_to_broadcast = True
             state.action_plan = self._get_path_from_direction(direction)
             # Look around to see if we can help
@@ -147,7 +146,7 @@ class ZappyServer:
 
         # "Elevation underway" is a notification, we must ignore it
         if message == "Elevation underway":
-            print(f"INFO: An elevation ritual is underway on the tile.")
+            logger.info(f"An elevation ritual is underway on the tile.")
             return
 
         # "Current level: n" is the result of an incantation.
@@ -155,25 +154,25 @@ class ZappyServer:
             self.pop_incantation()
 
             state.level_up()
-            print(f"--- LEVEL UP! Now level {state.get_level()} ---")
+            logger.info(f"--- LEVEL UP! Now level {state.get_level()} ---")
             return
 
         # Fatal notification
         if message == "dead":
             state.die()
-            print("--- I DIED ---")
+            logger.warning("--- I DIED ---")
             return
 
         # Handling of answers to commands
         if not self.command_queue:
-            print(f"Warning: Received message '{message}' without any command in the queue. Ignoring.")
+            logger.warning(f"Received message '{message}' without any command in the queue. Ignoring.")
             return
 
         last_command = self.pop_last_command()
 
         # If the command failed, cancel the action plan
         if message == "ko":
-            print(f"Command '{last_command}' failed.")
+            logger.warning(f"Command '{last_command}' failed.")
             state.reset_action_plan()
             return
 
@@ -188,11 +187,11 @@ class ZappyServer:
             case"Look":
                 parse_look(message, state)
             case "Connect_nbr":
-                print(f"Available connection slots: {message}")
+                logger.info(f"Available connection slots: {message}")
             case "Fork":
-                print("Successfully laid an egg!")
+                logger.info("Successfully laid an egg!")
             case _: # Weird case where we receive an unexpected answer for a known command. This should not happen.
-                print(f"WARNING: Received unexpected answer '{message}' for command '{last_command}'.")
+                logger.warning(f"Received unexpected answer '{message}' for command '{last_command}'.")
 
     def send_command_immediately(self, command: str):
         """
@@ -201,21 +200,24 @@ class ZappyServer:
         if self.sock is not None:
             self.sock.sendall(f"{command}\n".encode('utf-8'))
         else:
-            print("Error: Socket is not connected.", file=sys.stderr)
-            sys.exit(1)
+            raise ZappyError("send_command_immediately", "Socket is not connected.")
 
+    def close_sock(self):
+        if self.sock:
+            self.sock.close()
+            logger.info("Socket closed.")
 
     def send_command(self, command: str):
         """
         Add a command to the command queue and send it to the server.
         """
         if len(self.command_queue) < 10:
-            print(f"Me -> Server: {command}")
+            logger.debug(f"Me -> Server: {command}")
             self.send_command_immediately(command)
             self.command_queue.append(command)
             return True
         else:
-            print("Warning: Command queue is full. Cannot send new command yet.")
+            logger.warning("Command queue is full. Cannot send new command yet.")
         return False
 
     def pop_incantation(self):

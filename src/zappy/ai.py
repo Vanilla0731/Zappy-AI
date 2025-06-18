@@ -5,7 +5,7 @@
 ## AI
 ##
 
-import sys
+from . import logger
 from typing import Any
 from .decision_engine import DecisionEngine
 
@@ -17,16 +17,18 @@ class ZappyAI(DecisionEngine):
         """
         Main loop for the AI client.
         """
-        self.connect_to_server()
-        self.initial_connection(self)
-        self.send_command("Inventory")
+        ret = False
+        try:
+            self.connect_to_server()
+            width, heigth = self.initial_connection(self.team_name)
+            self.set_world_size(width, heigth)
+            self.send_command("Inventory")
 
-        while self.is_alive:
-            try:
+            while self.is_alive:
                 if not self.command_queue:
                     if not self.action_plan:
                         self.send_command("Inventory")
-                        self._make_decision()
+                        self.make_decision()
 
                 while self.action_plan and len(self.command_queue) < 10:
                     next_action = self.action_plan.pop(0)
@@ -34,16 +36,11 @@ class ZappyAI(DecisionEngine):
 
                 # Waiting for server answers
                 message = self.read_from_server()
-                print(f"Server -> Me: {message}")
+                logger.debug(f"Server -> Me: {message}")
                 self.handle_server_message(message, self)
-
-            except KeyboardInterrupt:
-                print("\rUser interruption. Closing connection.")
-                break
-            except Exception as e:
-                print(f"An error occurred in the main loop: {e}", file=sys.stderr)
-                break
-
-        if self.sock:
-            self.sock.close()
-            print("Socket closed.")
+        except KeyboardInterrupt:
+            logger.info("\rUser interruption. Closing connection.")
+            ret = True
+        finally:
+            self.close_sock()
+        return ret

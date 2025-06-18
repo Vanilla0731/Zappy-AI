@@ -6,6 +6,7 @@
 ##
 
 import random
+from . import logger
 from typing import Any
 from .server import ZappyServer
 from .player import PlayerState
@@ -96,7 +97,7 @@ class DecisionEngine(ZappyServer, PlayerState):
 
     def _survive(self):
         if self.inventory.get("food", 0) * 126 < FOOD_SURVIVAL_THRESHOLD:
-            print("Decision: Low on food, must find some to survive.")
+            logger.debug("Decision: Low on food, must find some to survive.")
             self.is_responding_to_broadcast = False
             food_tile_index = self._find_closest_ressource(self.vision, "food")
 
@@ -105,7 +106,7 @@ class DecisionEngine(ZappyServer, PlayerState):
                 self.send_command("Take food")
             elif food_tile_index > 0:
                 # If food is visible on another tile, move towards it.
-                print(f"Decision: Found food on tile {food_tile_index}. Moving towards it.")
+                logger.debug(f"Decision: Found food on tile {food_tile_index}. Moving towards it.")
                 self.action_plan = self._get_path_to_tile(food_tile_index)
                 self.action_plan.append("Take food")
             else:
@@ -120,7 +121,7 @@ class DecisionEngine(ZappyServer, PlayerState):
         if (self.inventory.get("food", 0) * 126 > FOOD_SURVIVAL_THRESHOLD * 2 and
             self.level >= 2 and
             random.randint(0, 20) == 0):
-            print("Decision: Conditions are good for reproduction. Forking...")
+            logger.debug("Decision: Conditions are good for reproduction. Forking...")
             self.send_command("Fork")
             return True
         return False
@@ -129,7 +130,7 @@ class DecisionEngine(ZappyServer, PlayerState):
         needed_for_elevation = self._check_elevation_requirements(self.level, self.inventory)
         if not needed_for_elevation:
             if self.inventory.get("food", 0) * 126 < 300 + (2 * 126): # 300 time units for incantation + 2 * 126 for the next level
-                print("Decision: Ready for elevation, but need food first to survive the ritual.")
+                logger.debug("Decision: Ready for elevation, but need food first to survive the ritual.")
                 self.send_command("Look")
                 return
 
@@ -137,7 +138,7 @@ class DecisionEngine(ZappyServer, PlayerState):
             players_on_tile = self.vision[0].count("player") + 1 # +1 for self
 
             if players_on_tile >= players_needed:
-                print("Decision: I have all stones and enough players for the next level. Preparing for incantation.")
+                logger.debug("Decision: I have all stones and enough players for the next level. Preparing for incantation.")
                 self.is_responding_to_broadcast = False
                 # Setting stones on the tile
                 requirements = ELEVATION_REQUIREMENTS[self.level][1]
@@ -148,7 +149,7 @@ class DecisionEngine(ZappyServer, PlayerState):
                 #Starting the Incantation
                 self.action_plan.append("Incantation")
             else:
-                print(f"Decision: Waiting for {players_needed - players_on_tile} more players to start incantation.")
+                logger.debug(f"Decision: Waiting for {players_needed - players_on_tile} more players to start incantation.")
                 message = f"{self.team_name}:Incantation:{self.level}"
                 self.send_command(f"Broadcast {message}")
                 # Looking around while waiting for more players
@@ -170,7 +171,7 @@ class DecisionEngine(ZappyServer, PlayerState):
         if closest_stone["stone"]:
             stone_to_get = closest_stone["stone"]
             tile_to_go = closest_stone["tile_index"]
-            print(f"Decision: Found {stone_to_get} on tile {tile_to_go}. Moving towards it.")
+            logger.debug(f"Decision: Found {stone_to_get} on tile {tile_to_go}. Moving towards it.")
             if tile_to_go == 0:
                 self.send_command(f"Take {stone_to_get}")
             else:
@@ -182,7 +183,7 @@ class DecisionEngine(ZappyServer, PlayerState):
         return False
 
     def _explore(self):
-        print("Decision: Exploring the world to find resources.")
+        logger.debug("Decision: Exploring the world to find resources.")
         self.send_command("Forward")
         # A bit of random to not go only forward
         if random.randint(0, 5) == 0:
@@ -190,7 +191,7 @@ class DecisionEngine(ZappyServer, PlayerState):
         self.vision = []
         return True
 
-    def _make_decision(self):
+    def make_decision(self):
         """
         Make decisions based on the current state of the AI.
         This method should be implemented with the AI's logic.
