@@ -5,15 +5,12 @@
 ## __init__
 ##
 
+# logger initialization
 import logging
-from .color_formatter import ColorFormatter
+from .color_formatter import init_logger
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-console_handler = logging.StreamHandler()
-formatter = ColorFormatter('%(asctime)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+init_logger(logger)
 
 # Constants for the AI client
 ELEVATION_REQUIREMENTS = {
