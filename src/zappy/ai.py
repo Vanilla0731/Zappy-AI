@@ -10,10 +10,10 @@ from typing import Any
 from .decision_engine import DecisionEngine
 
 class ZappyAI(DecisionEngine):
-    def __init__(self, host: str, port: int, team_name: str, **kwargs: dict[str, Any]):
+    def __init__(self, host: str, port: int, team_name: str) -> None:
         DecisionEngine.__init__(self, host=host, port=port, team_name=team_name)
 
-    def run(self):
+    def run(self) -> bool:
         """
         Main loop for the AI client.
         """

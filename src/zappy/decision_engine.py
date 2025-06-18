@@ -13,12 +13,12 @@ from .player import PlayerState
 from . import ELEVATION_REQUIREMENTS, FOOD_SURVIVAL_THRESHOLD
 
 class DecisionEngine(ZappyServer, PlayerState):
-    def __init__(self, host: str, port: int, team_name: str, **kwargs: dict[str, Any]):
-        ZappyServer.__init__(self, host, port, **kwargs)
-        PlayerState.__init__(self, team_name, **kwargs)
+    def __init__(self, host: str, port: int, team_name: str) -> None:
+        ZappyServer.__init__(self, host, port)
+        PlayerState.__init__(self, team_name)
 
     @staticmethod
-    def _get_path_to_tile(tile_index: int):
+    def _get_path_to_tile(tile_index: int) -> list:
         """
         Find the path to a tile and generate the sequence of commands to move to it.
         """
@@ -67,7 +67,7 @@ class DecisionEngine(ZappyServer, PlayerState):
         return -1
 
     @staticmethod
-    def _check_elevation_requirements(level: int, inventory: dict[str, int]):
+    def _check_elevation_requirements(level: int, inventory: dict[str, int]) -> (dict[str, str] | dict):
         """
         Check if the needed stones are available for the ritual.
         Return the missing ones or a message if already at max level.
@@ -82,20 +82,20 @@ class DecisionEngine(ZappyServer, PlayerState):
                 missing[stone] = required_count - inventory.get(stone, 0)
         return missing
 
-    def _respond_to_broadcast(self):
+    def _respond_to_broadcast(self) -> bool:
         if self.is_responding_to_broadcast and not self.action_plan:
             self.is_responding_to_broadcast = False
             self.send_command("Look")
             return True
         return False
 
-    def _update_vision(self):
+    def _update_vision(self) -> bool:
         if not self.vision:
             self.send_command("Look")
             return True
         return False
 
-    def _survive(self):
+    def _survive(self) -> bool:
         if self.inventory.get("food", 0) * 126 < FOOD_SURVIVAL_THRESHOLD:
             logger.debug("Decision: Low on food, must find some to survive.")
             self.is_responding_to_broadcast = False
@@ -116,7 +116,7 @@ class DecisionEngine(ZappyServer, PlayerState):
             return True
         return False
 
-    def _reproduct(self):
+    def _reproduct(self) -> bool:
         # Fork when we have enough food and are at a decent level
         if (self.inventory.get("food", 0) * 126 > FOOD_SURVIVAL_THRESHOLD * 2 and
             self.level >= 2 and
@@ -126,7 +126,7 @@ class DecisionEngine(ZappyServer, PlayerState):
             return True
         return False
 
-    def _elevate(self):
+    def _elevate(self) -> bool:
         needed_for_elevation = self._check_elevation_requirements(self.level, self.inventory)
         if not needed_for_elevation:
             if self.inventory.get("food", 0) * 126 < 300 + (2 * 126): # 300 time units for incantation + 2 * 126 for the next level
@@ -157,7 +157,7 @@ class DecisionEngine(ZappyServer, PlayerState):
             return True
         return False
 
-    def _gather(self):
+    def _gather(self) -> bool:
         needed_for_elevation = self._check_elevation_requirements(self.level, self.inventory)
         closest_stone = {"stone": None, "tile_index": -1}
         for stone in needed_for_elevation:
@@ -182,7 +182,7 @@ class DecisionEngine(ZappyServer, PlayerState):
             return True
         return False
 
-    def _explore(self):
+    def _explore(self) -> bool:
         logger.debug("Decision: Exploring the world to find resources.")
         self.send_command("Forward")
         # A bit of random to not go only forward

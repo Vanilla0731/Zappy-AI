@@ -8,7 +8,7 @@
 from . import logger
 from .player import PlayerState
 
-def parse_inventory(message: str, state: PlayerState):
+def parse_inventory(message: str, state: PlayerState) -> None:
     """
     Update the inventory from the server's answer.
     """
@@ -28,7 +28,7 @@ def parse_inventory(message: str, state: PlayerState):
     except ValueError:
         logger.warning(f"Could not parse inventory: {message}")
 
-def parse_look(message: str, state: PlayerState):
+def parse_look(message: str, state: PlayerState) -> None:
     """
     Update the vision from the server's answer.
     """

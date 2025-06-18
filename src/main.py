@@ -7,13 +7,14 @@
 
 import argparse
 from zappy import logger
+from typing import NoReturn
 from zappy.ai import ZappyAI
 from zappy.exception import ZappyError
 
 ZAPPY_AI_ERROR = 84
 ZAPPY_AI_SUCCESS = 0
 
-def main():
+def main() -> NoReturn:
     """
     Entry point of the Zappy AI client.
     """

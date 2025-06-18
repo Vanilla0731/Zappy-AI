@@ -14,15 +14,15 @@ from .exception import ZappyError
 from .parsing import parse_inventory, parse_look
 
 class ZappyServer:
-    def __init__(self, host: str, port: int, **kwargs: dict[str, Any]):
+    def __init__(self, host: str, port: int) -> None:
         self.host = host
         self.port = port
         self.sock = None
         self.buffer = ""
-        self.command_queue = []
+        self.command_queue: list[str | None] = []
 
     @staticmethod
-    def _get_path_from_direction(direction: int):
+    def _get_path_from_direction(direction: int) -> (list | list[str]):
         """
         Generate a sequence of commands to move towards the source of a sound.
         The direction indicates the tile from which the sound is coming.
@@ -66,7 +66,7 @@ class ZappyServer:
         logger.info(f"World size: {width}x{heigth}")
         return width, heigth
 
-    def connect_to_server(self):
+    def connect_to_server(self) -> None:
         """
         Create the socket(s) and connect to the Zappy server.
         """
@@ -81,7 +81,7 @@ class ZappyServer:
         except socket.timeout:
             raise ZappyError("connect_to_server", "No response from the server (timeout).")
 
-    def read_from_server(self):
+    def read_from_server(self) -> str:
         """
         Reads from the server buffer until a newline character is found.
         """
@@ -97,7 +97,7 @@ class ZappyServer:
         line, self.buffer = self.buffer.split("\n", 1)
         return line
 
-    def _handle_broadcast(self, message: str, state: PlayerState):
+    def _handle_broadcast(self, message: str, state: PlayerState) -> None:
         """
         Parses and reacts to a broadcast message from another player.
         Exemple de message du serveur: "message 2, NOM_EQUIPE:incantation:4"
@@ -134,7 +134,7 @@ class ZappyServer:
             # Look around to see if we can help
             state.action_plan.append("Look")
 
-    def handle_server_message(self, message: str, state: PlayerState):
+    def handle_server_message(self, message: str, state: PlayerState) -> None:
         """
         Handle messages received from the server.
         This method may be extended to handle different types of messages.
@@ -193,7 +193,7 @@ class ZappyServer:
             case _: # Weird case where we receive an unexpected answer for a known command. This should not happen.
                 logger.warning(f"Received unexpected answer '{message}' for command '{last_command}'.")
 
-    def send_command_immediately(self, command: str):
+    def send_command_immediately(self, command: str) -> None:
         """
         Send a command without using the command queue (for initial connection).
         """
@@ -202,12 +202,12 @@ class ZappyServer:
         else:
             raise ZappyError("send_command_immediately", "Socket is not connected.")
 
-    def close_sock(self):
+    def close_sock(self) -> None:
         if self.sock:
             self.sock.close()
             logger.info("Socket closed.")
 
-    def send_command(self, command: str):
+    def send_command(self, command: str) -> bool:
         """
         Add a command to the command queue and send it to the server.
         """
@@ -220,15 +220,14 @@ class ZappyServer:
             logger.warning("Command queue is full. Cannot send new command yet.")
         return False
 
-    def pop_incantation(self):
+    def pop_incantation(self) -> None:
         try:
-            incantation_index = self.command_queue.index("Incantation")
-            self.command_queue.pop(incantation_index)  # Remove the incantation command and its dependencies
-        except (ValueError, IndexError):
+            self.command_queue.remove("Incantation")
+        except ValueError:
             pass  # In case "Incantation" is not in the queue, we ignore it
 
-    def pop_last_command(self):
+    def pop_last_command(self) -> (str | None):
         return self.command_queue.pop(0) if self.command_queue else ""
 
-    def get_last_command(self):
+    def get_last_command(self) -> (str | None):
         return self.command_queue[0] if self.command_queue else ""
