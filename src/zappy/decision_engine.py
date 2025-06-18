@@ -7,7 +7,6 @@
 
 import random
 from . import logger
-from typing import Any
 from .server import ZappyServer
 from .player import PlayerState
 from . import ELEVATION_REQUIREMENTS, FOOD_SURVIVAL_THRESHOLD

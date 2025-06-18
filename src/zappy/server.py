@@ -8,7 +8,6 @@
 import sys
 import socket
 from . import logger
-from typing import Any
 from .player import PlayerState
 from .exception import ZappyError
 from .parsing import parse_inventory, parse_look
@@ -165,7 +164,6 @@ class ZappyServer:
 
         # Handling of answers to commands
         if not self.command_queue:
-            logger.warning(f"Received message '{message}' without any command in the queue. Ignoring.")
             return
 
         last_command = self.pop_last_command()

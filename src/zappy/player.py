@@ -5,8 +5,6 @@
 ## player
 ##
 
-from typing import Any
-
 class PlayerState:
     def __init__(self, team_name: str) -> None:
         self.level = 1

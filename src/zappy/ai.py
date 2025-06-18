@@ -6,7 +6,6 @@
 ##
 
 from . import logger
-from typing import Any
 from .decision_engine import DecisionEngine
 
 class ZappyAI(DecisionEngine):
