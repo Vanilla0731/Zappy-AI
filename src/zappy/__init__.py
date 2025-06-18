@@ -6,11 +6,9 @@
 ##
 
 # logger initialization
-import logging
 from .color_formatter import init_logger
 
-logger = logging.getLogger(__name__)
-init_logger(logger)
+logger = init_logger()
 
 # Constants for the AI client
 ELEVATION_REQUIREMENTS = {
