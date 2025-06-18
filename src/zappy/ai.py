@@ -11,7 +11,7 @@ from .decision_engine import DecisionEngine
 
 class ZappyAI(DecisionEngine):
     def __init__(self, host: str, port: int, team_name: str, **kwargs: dict[str, Any]):
-        super().__init__(host=host, port=port, team_name=team_name)
+        DecisionEngine.__init__(self, host=host, port=port, team_name=team_name)
 
     def run(self):
         """
