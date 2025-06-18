@@ -76,7 +76,7 @@ class ZappyAI:
                 print("Connection closed by the server.")
                 sys.exit(0)
             self.buffer += data
-        
+
         line, self.buffer = self.buffer.split("\n", 1)
         return line
 
@@ -89,7 +89,7 @@ class ZappyAI:
         if welcome_message != "WELCOME":
             print(f"Error: Expected 'WELCOME' from server, but got '{welcome_message}'", file=sys.stderr)
             sys.exit(84)
-        
+
         print(f"Server -> Me: {welcome_message}")
         print(f"Me -> Server: {self.team_name}")
         self.send_command_immediately(f"{self.team_name}")
@@ -97,7 +97,7 @@ class ZappyAI:
         if client_num_str == "ko":
             print("Error: Team can't have more members.", file=sys.stderr)
             sys.exit(84)
-        
+
         world_size_str = self._read_from_server()
         print(f"Server -> Me: {world_size_str}")
         self.world_width, self.world_height = map(int, world_size_str.split())
@@ -171,7 +171,7 @@ class ZappyAI:
         if not self.command_queue:
             print(f"Warning: Received message '{message}' without any command in the queue. Ignoring.")
             return
-        
+
         last_command = self.command_queue.pop(0)
 
         # If the command failed, cancel the action plan
@@ -189,6 +189,10 @@ class ZappyAI:
             self._parse_inventory(message)
         elif last_command == "Look":
             self._parse_look(message)
+        elif last_command == "Connect_nbr":
+            print(f"Available connection slots: {message}")
+        elif last_command == "Fork":
+            print("Successfully laid an egg!")
         else: # Weird case where we receive an unexpected answer for a known command. This should not happen.
             print(f"WARNING: Received unexpected answer '{message}' for command '{last_command}'.")
 
@@ -208,11 +212,11 @@ class ZappyAI:
                 name, quantity = item.strip().split()
                 new_inventory[name] = int(quantity)
             # Assign the new inventory
-            self.inventory = new_inventory 
+            self.inventory = new_inventory
             print(f"Inventory updated: {self.inventory}")
         except Exception as e:
             print(f"Could not parse inventory: {message} ({e})")
-    
+
 
     def _parse_look(self, message: str):
         """
@@ -251,7 +255,7 @@ class ZappyAI:
             if ressource_name in tile_content:
                 return i
         return -1
-    
+
 
     def _get_path_to_tile(self, tile_index: int):
         """
@@ -259,7 +263,7 @@ class ZappyAI:
         """
         if tile_index <= 0:
             return []
-        
+
         path = []
         level = 0
         tiles_in_level = 1
@@ -287,7 +291,7 @@ class ZappyAI:
             # Already at the center of the level
             pass
         return path
-    
+
 
     def _get_path_from_direction(self, direction: int):
         """
@@ -310,7 +314,7 @@ class ZappyAI:
             8: ["Forward", "Right", "Forward"],
         }
         return paths.get(direction, [])
-    
+
 
     def _handle_broadcast(self, message: str):
         """
@@ -372,18 +376,18 @@ class ZappyAI:
                 message = self._read_from_server()
                 print(f"Server -> Me: {message}")
                 self.handle_server_message(message)
-                
+
             except KeyboardInterrupt:
                 print("\rUser interruption. Closing connection.")
                 break
             except Exception as e:
                 print(f"An error occurred in the main loop: {e}", file=sys.stderr)
                 break
-        
+
         if self.sock:
             self.sock.close()
             print("Socket closed.")
-    
+
 
     def _make_decision(self):
         """
@@ -421,7 +425,16 @@ class ZappyAI:
             self.vision = []  # Vision would be invalid after moving
             return
 
-        # Priority 2: ELEVATION
+        # Priority 2: REPRODUCTION (Fork)
+        # Fork when we have enough food and are at a decent level
+        if (self.inventory.get("food", 0) * 126 > FOOD_SURVIVAL_THRESHOLD * 2 and
+            self.level >= 2 and
+            random.randint(0, 20) == 0):
+            print("Decision: Conditions are good for reproduction. Forking...")
+            self.send_command("Fork")
+            return
+
+        # Priority 3: ELEVATION
         needed_for_elevation = self._check_elevation_requirements()
         if not needed_for_elevation:
             if self.inventory.get("food", 0) * 126 < 300 + (2 * 126): # 300 time units for incantation + 2 * 126 for the next level
@@ -451,7 +464,7 @@ class ZappyAI:
                 self.send_command("Look")
             return
 
-        # Priority 3: GATHERING
+        # Priority 4: GATHERING
         closest_stone = {"stone": None, "tile_index": -1}
         for stone in needed_for_elevation:
             tile_index = self._find_closest_ressource(stone)
@@ -460,7 +473,7 @@ class ZappyAI:
                 if closest_stone["tile_index"] == -1 or tile_index < closest_stone["tile_index"]:
                     closest_stone["stone"] = stone
                     closest_stone["tile_index"] = tile_index
-        
+
         if closest_stone["stone"]:
             stone_to_get = closest_stone["stone"]
             tile_to_go = closest_stone["tile_index"]
@@ -470,18 +483,18 @@ class ZappyAI:
             else:
                 self.action_plan = self._get_path_to_tile(tile_to_go)
                 self.action_plan.append(f"Take {stone_to_get}")
-        
+
             self.vision = []  # Vision would be invalid after moving
             return
 
-        # Priority 4: EXPLORATION
+        # Priority 5: EXPLORATION
         print("Decision: Exploring the world to find resources.")
         self.send_command("Forward")
         # A bit of random to not go only forward
         if random.randint(0, 5) == 0:
             self.send_command(random.choice(["Left", "Right"]))
         self.vision = []
-        
+
 
 def main():
     """
