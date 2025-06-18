@@ -155,6 +155,10 @@ class ZappyAI:
             self._parse_inventory(message)
         elif last_command == "Look":
             self._parse_look(message)
+        elif last_command == "Connect_nbr":
+            print(f"Available connection slots: {message}")
+        elif last_command == "Fork":
+            print("Successfully laid an egg!")
 
 
     def _parse_inventory(self, message: str):
@@ -247,7 +251,16 @@ class ZappyAI:
                 self.send_command(random.choice(["Forward", "Left", "Right"]))
             return
 
-        # Priority 2: ELEVATION
+        # Priority 2: REPRODUCTION (Fork)
+        # Fork when we have enough food and are at a decent level
+        if (self.inventory.get("food", 0) * 126 > FOOD_SURVIVAL_THRESHOLD * 2 and 
+            self.level >= 2 and 
+            random.randint(0, 20) == 0):
+            print("Decision: Conditions are good for reproduction. Forking...")
+            self.send_command("Fork")
+            return
+
+        # Priority 3: ELEVATION
         needed_for_elevation = self._check_elevation_requirements()
         if not needed_for_elevation:
             print("Decision: I have all stones for the next level. Preparing for incantation.")
@@ -261,7 +274,7 @@ class ZappyAI:
             self.send_command("Incantation")
             return
 
-        # Priority 3: GATHERING
+        # Priority 4: GATHERING
         if self.vision:
             tile_content = self.vision[0].split()
             for stone in needed_for_elevation:
@@ -270,7 +283,7 @@ class ZappyAI:
                     self.send_command(f"Take {stone}")
                     return
 
-        # Priority 4: EXPLORATION
+        # Priority 5: EXPLORATION
         print("Decision: Exploring the world to find resources.")
         if not self.vision:
             self.send_command("Look")  # "Look" before moving
