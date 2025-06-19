@@ -21,4 +21,11 @@ ELEVATION_REQUIREMENTS = {
     7: (6, {"linemate": 2, "deraumere": 2, "sibur": 2, "mendiane": 2, "phiras": 2, "thystame": 1}),
 }
 
+ACION_SPEED = [
+    ["inventory"],
+    ["forward", "right", "left", "look", "broadcast", "eject", "take", "set"],
+    ["fork"],
+    ["incantation"]
+]
+
 FOOD_SURVIVAL_THRESHOLD = 8 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
