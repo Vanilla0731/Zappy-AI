@@ -21,7 +21,7 @@ ELEVATION_REQUIREMENTS = {
     7: (6, {"linemate": 2, "deraumere": 2, "sibur": 2, "mendiane": 2, "phiras": 2, "thystame": 1}),
 }
 
-ACION_SPEED = [
+ACTION_SPEED = [
     ["inventory"],
     ["forward", "right", "left", "look", "broadcast", "eject", "take", "set"],
     ["fork"],

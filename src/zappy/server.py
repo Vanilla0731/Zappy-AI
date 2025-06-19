@@ -9,7 +9,7 @@ import sys
 import socket
 from .player import PlayerState
 from .exception import ZappyError
-from . import logger, ACION_SPEED
+from . import logger, ACTION_SPEED
 from .parsing import parse_inventory, parse_look
 
 class ZappyServer:
@@ -136,7 +136,7 @@ class ZappyServer:
 
     @staticmethod
     def find_action_index(action: str) -> int:
-        for index, val in enumerate(ACION_SPEED):
+        for index, val in enumerate(ACTION_SPEED):
             if action in val:
                 return index
         return -1
