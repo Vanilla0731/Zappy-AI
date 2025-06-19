@@ -11,10 +11,13 @@ from .server import ZappyServer
 from .player import PlayerState
 from . import ELEVATION_REQUIREMENTS, FOOD_SURVIVAL_THRESHOLD
 
+FORK_TIMER = 40
+
 class DecisionEngine(ZappyServer, PlayerState):
     def __init__(self, host: str, port: int, team_name: str) -> None:
         ZappyServer.__init__(self, host, port)
         PlayerState.__init__(self, team_name)
+        self.timer_fork = FORK_TIMER
 
     @staticmethod
     def _get_path_to_tile(tile_index: int) -> list:
@@ -117,11 +120,14 @@ class DecisionEngine(ZappyServer, PlayerState):
 
     def _reproduct(self) -> bool:
         # Fork when we have enough food and are at a decent level
-        if (self.inventory.get("food", 0) * 126 > FOOD_SURVIVAL_THRESHOLD * 2 and
+        logger.debug(f"check value : {self.inventory.get('food', 0) * 126}")
+        logger.debug(f'Food attendue : {FOOD_SURVIVAL_THRESHOLD}')
+        if (self.inventory.get("food", 0) * 126 >= FOOD_SURVIVAL_THRESHOLD and
             self.level >= 2 and
-            random.randint(0, 20) == 0):
+            self.timer_fork == 0):
             logger.debug("Decision: Conditions are good for reproduction. Forking...")
             self.send_command("Fork")
+            self.timer_fork = FORK_TIMER
             return True
         return False
 
