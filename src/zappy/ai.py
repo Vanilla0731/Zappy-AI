@@ -37,6 +37,8 @@ class ZappyAI(DecisionEngine):
                 message = self.read_from_server()
                 logger.debug(f"Server -> Me: {message}")
                 self.handle_server_message(message, self)
+                if (self.timer_fork > 0):
+                self.timer_fork = self.timer_fork - 1
         except KeyboardInterrupt:
             logger.info("\rUser interruption. Closing connection.")
             ret = True

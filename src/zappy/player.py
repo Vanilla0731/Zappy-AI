@@ -8,6 +8,7 @@
 class PlayerState:
     def __init__(self, team_name: str) -> None:
         self.level = 1
+        self.timer_fork = 40
         self.vision = []
         self.inventory = {}
         self.is_alive = True

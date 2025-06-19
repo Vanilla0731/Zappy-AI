@@ -117,11 +117,14 @@ class DecisionEngine(ZappyServer, PlayerState):
 
     def _reproduct(self) -> bool:
         # Fork when we have enough food and are at a decent level
-        if (self.inventory.get("food", 0) * 126 > FOOD_SURVIVAL_THRESHOLD * 2 and
+        logger.debug(f"check value : {self.inventory.get('food', 0) * 126}")
+        logger.debug(f'Food attendue : {FOOD_SURVIVAL_THRESHOLD}')
+        if (self.inventory.get("food", 0) * 126 >= FOOD_SURVIVAL_THRESHOLD and
             self.level >= 2 and
-            random.randint(0, 20) == 0):
+            self.timer_fork == 0):
             logger.debug("Decision: Conditions are good for reproduction. Forking...")
             self.send_command("Fork")
+            self.timer_fork = 40
             return True
         return False
 
