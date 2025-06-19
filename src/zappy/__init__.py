@@ -6,7 +6,7 @@
 ##
 
 # logger initialization
-from .color_formatter import init_logger
+from .logger import init_logger
 
 logger = init_logger()
 
