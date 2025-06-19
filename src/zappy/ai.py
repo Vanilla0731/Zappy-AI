@@ -24,12 +24,13 @@ class ZappyAI(DecisionEngine):
             self.send_command("Inventory")
 
             while self.is_alive:
-                if not self.command_queue:
-                    if not self.action_plan:
+                if not self.command_queue and not self.action_plan:
                         self.send_command("Inventory")
                         self.make_decision()
 
                 while self.action_plan and len(self.command_queue) < 10:
+                    if not self.can_send_action_plan_command(self.action_plan[0]):
+                        break
                     next_action = self.action_plan.pop(0)
                     self.send_command(next_action)
 
@@ -40,7 +41,7 @@ class ZappyAI(DecisionEngine):
                 if (self.timer_fork > 0):
                     self.timer_fork = self.timer_fork - 1
         except KeyboardInterrupt:
-            logger.info("\rUser interruption. Closing connection.")
+            logger.info("User interruption. Closing connection.")
             ret = True
         finally:
             self.close_sock()

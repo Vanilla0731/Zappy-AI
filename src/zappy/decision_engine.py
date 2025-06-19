@@ -137,10 +137,10 @@ class DecisionEngine(ZappyServer, PlayerState):
             if self.inventory.get("food", 0) * 126 < 300 + (2 * 126): # 300 time units for incantation + 2 * 126 for the next level
                 logger.debug("Decision: Ready for elevation, but need food first to survive the ritual.")
                 self.send_command("Look")
-                return
+                return True
 
             players_needed = ELEVATION_REQUIREMENTS[self.level][0]
-            players_on_tile = self.vision[0].count("player") + 1 # +1 for self
+            players_on_tile = self.vision[0].count("player")
 
             if players_on_tile >= players_needed:
                 logger.debug("Decision: I have all stones and enough players for the next level. Preparing for incantation.")

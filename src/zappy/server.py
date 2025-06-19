@@ -7,9 +7,9 @@
 
 import sys
 import socket
-from . import logger
 from .player import PlayerState
 from .exception import ZappyError
+from . import logger, ACTION_SPEED
 from .parsing import parse_inventory, parse_look
 
 class ZappyServer:
@@ -19,6 +19,7 @@ class ZappyServer:
         self.sock = None
         self.buffer = ""
         self.command_queue: list[str | None] = []
+        self.sent_commands: list[str | None] = []
 
     @staticmethod
     def _get_path_from_direction(direction: int) -> (list | list[str]):
@@ -133,6 +134,26 @@ class ZappyServer:
             # Look around to see if we can help
             state.action_plan.append("Look")
 
+    @staticmethod
+    def find_action_index(action: str) -> int:
+        for index, val in enumerate(ACTION_SPEED):
+            if action in val:
+                return index
+        return -1
+
+    def can_send_action_plan_command(self, command: str) -> bool:
+        if not self.sent_commands:
+            return True
+
+        last_index = self.find_action_index(self.sent_commands[len(self.sent_commands) - 1])
+        next_index = self.find_action_index(command.split(' ', 1)[0].lower())
+
+        if last_index == -1 or next_index == -1:
+            raise ZappyError("can_send_action_plan_command", "invalid action.")
+
+        return next_index <= last_index
+
+
     def handle_server_message(self, message: str, state: PlayerState) -> None:
         """
         Handle messages received from the server.
@@ -140,7 +161,9 @@ class ZappyServer:
         """
         # Holding of every non-solicited messages
         if message.startswith("message"):
-            self._handle_broadcast(message)
+            if (self.sent_commands):
+                self.sent_commands.pop(0)
+            self._handle_broadcast(message, state)
             return
 
         # "Elevation underway" is a notification, we must ignore it
@@ -151,8 +174,9 @@ class ZappyServer:
         # "Current level: n" is the result of an incantation.
         if message.startswith("Current level:"):
             self.pop_incantation()
-
             state.level_up()
+            if (self.sent_commands):
+                self.sent_commands.pop(0)
             logger.info(f"--- LEVEL UP! Now level {state.get_level()} ---")
             return
 
@@ -171,22 +195,34 @@ class ZappyServer:
         # If the command failed, cancel the action plan
         if message == "ko":
             logger.warning(f"Command '{last_command}' failed.")
+            if (self.sent_commands):
+                self.sent_commands.pop(0)
             state.reset_action_plan()
             return
 
         # If the command was successful, no need for a specific treatment
         if message == "ok":
+            if (self.sent_commands):
+                self.sent_commands.pop(0)
             return
 
         # If the command was "Inventory" or "Look", we parse the message
         match last_command:
             case "Inventory":
+                if (self.sent_commands):
+                    self.sent_commands.pop(0)
                 parse_inventory(message, state)
             case"Look":
+                if (self.sent_commands):
+                    self.sent_commands.pop(0)
                 parse_look(message, state)
             case "Connect_nbr":
+                if (self.sent_commands):
+                    self.sent_commands.pop(0)
                 logger.info(f"Available connection slots: {message}")
             case "Fork":
+                if (self.sent_commands):
+                    self.sent_commands.pop(0)
                 logger.info("Successfully laid an egg!")
             case _: # Weird case where we receive an unexpected answer for a known command. This should not happen.
                 logger.warning(f"Received unexpected answer '{message}' for command '{last_command}'.")
@@ -213,9 +249,9 @@ class ZappyServer:
             logger.debug(f"Me -> Server: {command}")
             self.send_command_immediately(command)
             self.command_queue.append(command)
+            self.sent_commands.append(command.split(' ', 1)[0].lower())
             return True
-        else:
-            logger.warning("Command queue is full. Cannot send new command yet.")
+        logger.warning("Command queue is full. Cannot send new command yet.")
         return False
 
     def pop_incantation(self) -> None:
