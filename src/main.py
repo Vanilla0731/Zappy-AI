@@ -13,6 +13,7 @@ from zappy.exception import ZappyError
 
 ZAPPY_AI_ERROR = 84
 ZAPPY_AI_SUCCESS = 0
+ZAP_AI_VERSION = "0.0.1"
 
 def main() -> NoReturn:
     """
@@ -22,6 +23,7 @@ def main() -> NoReturn:
     parser.add_argument('-p', '--port', type=int, required=True, help='Port to connect to the Zappy server')
     parser.add_argument('-n', '--name', type=str, required=True, help='Name of the team to join')
     parser.add_argument('-h', '--host', type=str, default='localhost', help='Host to connect to the Zappy server')
+    parser.add_argument('-v', '--version', action='version', version=f"ZappyAI version {ZAP_AI_VERSION}", help='Print the version of the AI')
 
     args = parser.parse_args()
 
