@@ -51,3 +51,6 @@ build/
 *.dylib
 !test_compilation.yml
 ref_binaries/
+venv/
+*.log
+!bonus/.env
