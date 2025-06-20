@@ -38,6 +38,8 @@ except SimError as e:
     exit(SIM_ERROR)
 
 def signal_handler(sig, frame):
+    sig_str = "SIGINT" if sig == signal.SIGINT else "SIGTERM"
+    logger.info(f"\r{sig_str} detected. Stopping simulator.")
     _exit(SIM_SUCCESS)
 
 def start_threads() -> tuple[threading.Thread, list[threading.Thread]]:

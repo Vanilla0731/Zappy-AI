@@ -19,7 +19,7 @@ def load_dotenv() -> None:
     dotenv_path = None
 
     for filepath in DOTENV_PATHS:
-        tmppath = path.join(filepath, ".env")
+        tmppath = path.realpath(path.join(filepath, ".env"))
         if path.exists(tmppath):
             dotenv_path = tmppath
             break
