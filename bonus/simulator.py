@@ -32,6 +32,7 @@ try:
     from simulator.start_server import start_server
 except (TypeError, ValueError):
     logger.error(f"An error occured at main: NUM_AI is not a positive int")
+    exit(SIM_ERROR)
 except SimError as e:
     logger.error(f"An error occured at {e.where}: {e.what}")
     exit(SIM_ERROR)
