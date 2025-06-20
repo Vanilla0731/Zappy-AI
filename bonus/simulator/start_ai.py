@@ -6,6 +6,7 @@
 ##
 
 import subprocess
+from . import logger
 from uuid import uuid4
 from .exception import SimError
 from os import getenv, path, makedirs
@@ -19,6 +20,9 @@ UNINITIALIZED_VARS = [k for k, v in AI_ENV.items() if v is None]
 
 if UNINITIALIZED_VARS:
     raise SimError("start_ai", f"The following environment variables should be initialized but they are not: {UNINITIALIZED_VARS}")
+
+logger.debug(f"AI COMMAND: {AI_ENV.get("AI_PATH")} {AI_ENV.get("AI_ARGS")}")
+
 
 def get_log_path() -> str:
     log_dir = path.join(path.dirname(path.abspath(__file__)), "logs")
@@ -37,10 +41,17 @@ def get_log_path() -> str:
 def start_ai():
     log_path = get_log_path()
 
-    with open(log_path, "w") as logfile:
-        process = subprocess.Popen(
-            [AI_ENV.get("AI_PATH")] + AI_ENV.get("AI_ARGS", "").split(' '),
-            stdout=logfile,
-            stderr=logfile
-        )
-        process.wait()
+    process = None
+    try:
+        with open(log_path, "w") as logfile:
+            process = subprocess.Popen(
+                [AI_ENV.get("AI_PATH")] + AI_ENV.get("AI_ARGS", "").split(' '),
+                stdout=logfile,
+                stderr=logfile
+            )
+            process.wait()
+    except Exception as e:
+        logger.error("Error during server monitoring:", e)
+    finally:
+        if process and process.poll() is None:
+            process.terminate()

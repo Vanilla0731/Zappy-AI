@@ -28,8 +28,8 @@ try:
     if MAIN_ENV.get("NUM_AI") < 0:
         raise ValueError
 
-    from simulator.start_ai import start_ai
     from simulator.start_server import start_server
+    from simulator.start_ai import start_ai
 except (TypeError, ValueError):
     logger.error(f"An error occured at main: NUM_AI is not a positive int")
     exit(SIM_ERROR)
@@ -45,8 +45,11 @@ def signal_handler(sig, frame):
 def start_threads() -> tuple[threading.Thread, list[threading.Thread]]:
     server_thread = threading.Thread(target=start_server, name="server_thread")
 
+    NUM_AI = MAIN_ENV.get("NUM_AI")
+    logger.debug(f"USING NUM_AI={NUM_AI}")
+
     ai_threads: list[threading.Thread] = []
-    for i in range(MAIN_ENV.get("NUM_AI")):
+    for i in range(NUM_AI):
         ai_threads.append(threading.Thread(target=start_ai, name=f"ai_{i}_thread"))
 
     server_thread.start()

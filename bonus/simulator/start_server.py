@@ -21,24 +21,37 @@ UNINITIALIZED_VARS = [k for k, v in SERVER_ENV.items() if v is None]
 if UNINITIALIZED_VARS:
     raise SimError("start_server", f"The following environment variables should be initialized but they are not: {UNINITIALIZED_VARS}")
 
+logger.debug(f"SERVER COMMAND: {SERVER_ENV.get("SERVER_PATH")} {SERVER_ENV.get("SERVER_ARGS")}")
+
 def start_server():
-    process = subprocess.Popen(
-        [SERVER_ENV.get("SERVER_PATH")] + SERVER_ENV.get("SERVER_ARGS", "").split(),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+    tmp = getenv("SHOULD_QUIT_ON_FULL_TEAM")
 
     try:
-        for line in process.stderr:
-            if "Client" in line and "tried to join full team" in line:
-                logger.info("Detected full team join attempt — sending SIGINT.")
-                process.send_signal(SIGINT)
-                break
+        should_quit = bool(int(tmp)) if tmp else False
+    except ValueError:
+        should_quit = False
+
+    process = None
+
+    logger.debug(f"USING SHOULD_QUIT_ON_FULL_TEAM={should_quit}")
+
+    try:
+        process = subprocess.Popen(
+            [SERVER_ENV.get("SERVER_PATH")] + SERVER_ENV.get("SERVER_ARGS", "").split(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if should_quit:
+            for line in process.stderr:
+                if "Client" in line and "tried to join full team" in line:
+                    logger.info("Detected full team join attempt — sending SIGINT.")
+                    process.send_signal(SIGINT)
+                    break
 
         process.wait()
     except Exception as e:
         logger.error("Error during server monitoring:", e)
     finally:
-        if process.poll() is None:
+        if process and process.poll() is None:
             process.terminate()
