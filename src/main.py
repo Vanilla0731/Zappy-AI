@@ -8,7 +8,8 @@
 import argparse
 from zappy import logger
 from typing import NoReturn
-from zappy.ai import ZappyAI
+from zappy.ai import ZappyAI # Basic Scripted AI client
+from zappy.rl_ai import RLAI # Reinforcement Learning AI client
 from zappy.exception import ZappyError
 
 ZAPPY_AI_ERROR = 84
@@ -29,7 +30,7 @@ def main() -> NoReturn:
 
     success = False
     try:
-        ai_client = ZappyAI(host=args.host, port=args.port, team_name=args.name)
+        ai_client = RLAI(host=args.host, port=args.port, team_name=args.name)
         success = ai_client.run()
     except ZappyError as e:
         logger.error(f"An error occurred at: {e.where}: {e.what}")

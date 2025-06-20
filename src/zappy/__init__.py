@@ -29,3 +29,17 @@ ACTION_SPEED = [
 ]
 
 FOOD_SURVIVAL_THRESHOLD = 8 * 126 # 1 food = 126 time units, 20 food is the minimum to survive
+
+RESOURCES = [
+    "food", "linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"
+]
+
+ACTIONS = [
+    "Forward", "Right", "Left", "Look", "Inventory", "Incantation", "Fork"
+]
+
+for resource in RESOURCES:
+    ACTIONS.append(f"Take {resource.capitalize()}")
+    ACTIONS.append(f"Set {resource.capitalize()}")
+
+# Exemple: ACTIONS[0] -> "Forward" ; ACTIONS[7] -> "Take food"
