@@ -35,6 +35,9 @@ def main() -> NoReturn:
     except ZappyError as e:
         logger.error(f"An error occurred at: {e.where}: {e.what}")
         success = False
+    except KeyboardInterrupt:
+        logger.info("Caught KeyboardInterrupt... Stopping AI")
+        success = True
     exit(ZAPPY_AI_SUCCESS if success else ZAPPY_AI_ERROR)
 
 if __name__ == "__main__":

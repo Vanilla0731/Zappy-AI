@@ -43,7 +43,7 @@ def signal_handler(sig, frame):
     _exit(SIM_SUCCESS)
 
 def start_threads() -> tuple[threading.Thread, list[threading.Thread]]:
-    server_thread = threading.Thread(target=start_server, name="server_thread")
+    #server_thread = threading.Thread(target=start_server, name="server_thread")
 
     NUM_AI = MAIN_ENV.get("NUM_AI")
     logger.debug(f"USING NUM_AI={NUM_AI}")
@@ -52,25 +52,26 @@ def start_threads() -> tuple[threading.Thread, list[threading.Thread]]:
     for i in range(NUM_AI):
         ai_threads.append(threading.Thread(target=start_ai, name=f"ai_{i}_thread"))
 
-    server_thread.start()
+    #server_thread.start()
     for thread in ai_threads:
         thread.start()
 
+    return None, ai_threads
     return server_thread, ai_threads
 
 def start_monitors(server_thread: threading.Thread, ai_threads: list[threading.Thread]) -> None:
-    server_monitor = threading.Thread(target=monitor_thread,
-                                      args=(server_thread, start_server))
+    # server_monitor = threading.Thread(target=monitor_thread,
+    #                                  args=(server_thread, start_server))
 
     ai_monitors: list[threading.Thread] = []
     for thread in ai_threads:
         ai_monitors.append(threading.Thread(target=monitor_thread,
                                             args=(thread, start_ai)))
-    server_monitor.start()
+    #server_monitor.start()
     for thread in ai_monitors:
         thread.start()
 
-    server_monitor.join()
+    #server_monitor.join()
     for thread in ai_monitors:
         thread.join()
 

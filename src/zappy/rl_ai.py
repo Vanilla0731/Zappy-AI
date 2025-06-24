@@ -69,7 +69,7 @@ class RLAI(ZappyServer, PlayerState):
                 logger.info(f"REWARD: Picked up {res}! +1.0")
         
         if not self.is_alive:
-            reward -= 10.0 # Great penalty for dying
+            reward -= 60.0 # Great penalty for dying
             logger.info("REWARD: Died! -10.0")
             
         if action_result == "ko":

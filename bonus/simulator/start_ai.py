@@ -7,9 +7,10 @@
 
 import subprocess
 from . import logger
-from uuid import uuid4
+from os import getenv
 from .exception import SimError
-from os import getenv, path, makedirs
+from .file_mgmt import get_log_path, strip_ansi
+
 
 AI_ENV = {
     "AI_PATH": getenv("AI_PATH"),
@@ -23,32 +24,23 @@ if UNINITIALIZED_VARS:
 
 logger.debug(f"AI COMMAND: {AI_ENV.get("AI_PATH")} {AI_ENV.get("AI_ARGS")}")
 
-
-def get_log_path() -> str:
-    log_dir = path.join(path.dirname(path.abspath(__file__)), "logs")
-    makedirs(log_dir, exist_ok=True)
-
-    log_path = ""
-
-    while True:
-        log_filename = f"ai_log_{uuid4().hex}.log"
-        log_path = path.join(log_dir, log_filename)
-        if not path.exists(log_path):
-            break
-
-    return log_path
-
 def start_ai():
-    log_path = get_log_path()
+    log_path = get_log_path("ai")
 
     process = None
     try:
         with open(log_path, "w") as logfile:
             process = subprocess.Popen(
                 [AI_ENV.get("AI_PATH")] + AI_ENV.get("AI_ARGS", "").split(' '),
-                stdout=logfile,
-                stderr=logfile
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1  
             )
+            for line in process.stdout:
+                clean_line = strip_ansi(line)
+                logfile.write(clean_line)
+                logfile.flush()
             process.wait()
     except Exception as e:
         logger.error("Error during server monitoring:", e)

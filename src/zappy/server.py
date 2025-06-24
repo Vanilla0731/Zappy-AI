@@ -95,6 +95,8 @@ class ZappyServer:
             self.buffer += data
 
         line, self.buffer = self.buffer.split("\n", 1)
+        logger.debug(f"line: {line}")
+        logger.debug(f"self.buffer: {self.buffer}")
         return line
 
     def _handle_broadcast(self, message: str, state: PlayerState) -> None:
@@ -231,9 +233,12 @@ class ZappyServer:
         """
         Send a command without using the command queue (for initial connection).
         """
-        if self.sock is not None:
-            self.sock.sendall(f"{command}\n".encode('utf-8'))
-        else:
+        try:
+            if self.sock is not None:
+                self.sock.sendall(f"{command}\n".encode('utf-8'))
+            else:
+                raise BrokenPipeError
+        except BrokenPipeError:
             raise ZappyError("send_command_immediately", "Socket is not connected.")
 
     def close_sock(self) -> None:

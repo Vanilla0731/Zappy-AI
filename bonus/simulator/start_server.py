@@ -10,6 +10,7 @@ from . import logger
 from os import getenv
 from signal import SIGINT
 from .exception import SimError
+from .file_mgmt import get_log_path, strip_ansi
 
 SERVER_ENV = {
     "SERVER_PATH": getenv("SERVER_PATH"),
@@ -23,31 +24,37 @@ if UNINITIALIZED_VARS:
 
 logger.debug(f"SERVER COMMAND: {SERVER_ENV.get("SERVER_PATH")} {SERVER_ENV.get("SERVER_ARGS")}")
 
+tmp = getenv("SHOULD_QUIT_ON_FULL_TEAM")
+
+try:
+    should_quit = bool(int(tmp)) if tmp else False
+except ValueError:
+    should_quit = False
+
+process = None
+
+logger.debug(f"USING SHOULD_QUIT_ON_FULL_TEAM={should_quit}")
+
 def start_server():
-    tmp = getenv("SHOULD_QUIT_ON_FULL_TEAM")
+    log_path = get_log_path("server")
 
     try:
-        should_quit = bool(int(tmp)) if tmp else False
-    except ValueError:
-        should_quit = False
-
-    process = None
-
-    logger.debug(f"USING SHOULD_QUIT_ON_FULL_TEAM={should_quit}")
-
-    try:
-        process = subprocess.Popen(
-            [SERVER_ENV.get("SERVER_PATH")] + SERVER_ENV.get("SERVER_ARGS", "").split(),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        if should_quit:
-            for line in process.stderr:
-                if "Client" in line and "tried to join full team" in line:
-                    logger.info("Detected full team join attempt — sending SIGINT.")
-                    process.send_signal(SIGINT)
-                    break
+        with open(log_path, "w") as logfile:
+            process = subprocess.Popen(
+                ["valgrind", SERVER_ENV.get("SERVER_PATH")] + SERVER_ENV.get("SERVER_ARGS", "").split(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            if should_quit:
+                for line in process.stdout:
+                    clean_line = strip_ansi(line)
+                    logfile.write(clean_line)
+                    logfile.flush()
+                    if "Client" in line and "tried to join full team" in line:
+                        logger.info("Detected full team join attempt — sending SIGINT.")
+                        process.send_signal(SIGINT)
+                        break
 
         process.wait()
     except Exception as e:
