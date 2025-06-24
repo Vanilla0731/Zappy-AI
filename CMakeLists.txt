@@ -82,43 +82,38 @@ endif()
 
 option(ZAP_AI_ENABLE_DEBUG "Enable debug definition" OFF)
 
-if(ZAP_AI_ENABLE_DEBUG)
-    target_compile_definitions(zappy_ai PRIVATE CEXTEND_DEBUG=1)
-endif()
-
 ########################################
 
 file(GLOB TEST_SOURCE
     "tests/*.c")
 
-add_executable(zap_srv_unit_tests
+add_executable(unit_tests
     ${TEST_SOURCE}
     ${MAIN_SOURCE}
     ${PATH_SOURCE}
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
-    target_compile_options(zap_srv_unit_tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(zap_srv_unit_tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    target_compile_options(unit_tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(unit_tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(zap_srv_unit_tests PRIVATE -fprofile-arcs -ftest-coverage)
-    target_link_options(zap_srv_unit_tests PRIVATE -fprofile-arcs -ftest-coverage)
+    target_compile_options(unit_tests PRIVATE -fprofile-arcs -ftest-coverage)
+    target_link_options(unit_tests PRIVATE -fprofile-arcs -ftest-coverage)
 endif()
 
-target_compile_definitions(zap_srv_unit_tests PRIVATE UNIT_TESTS=1)
+target_compile_definitions(unit_tests PRIVATE UNIT_TESTS=1)
 
-target_link_libraries(zap_srv_unit_tests PRIVATE criterion sfml-graphics sfml-system sfml-window, cextend)
+target_link_libraries(unit_tests PRIVATE criterion)
 
-target_include_directories(zap_srv_unit_tests PRIVATE
+target_include_directories(unit_tests PRIVATE
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/lib-cextend/include>
 )
 
 enable_testing()
-add_test(NAME zap_srv_unit_tests COMMAND zap_srv_unit_tests)
+add_test(NAME unit_tests COMMAND unit_tests)
 
-add_custom_target(zap_srv_tests_run
-    COMMAND zap_srv_unit_tests
-    DEPENDS zap_srv_unit_tests
+add_custom_target(tests_run
+    COMMAND unit_tests
+    DEPENDS unit_tests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
