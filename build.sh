@@ -22,83 +22,50 @@ function _info()
     echo -e "${ORG}[🚧] RUNNING:\t${RST} ${ILC}$1${RST}"
 }
 
-function _all()
+function _base_run()
 {
+    local cmake_args="$1"
+
     if ! { command -v cmake > /dev/null; } 2>&1; then
         _error "command 'cmake' not found" "please install 'cmake' or 'nix develop' 🤓"
     fi
     _success "command 'cmake' found, building..."
-    _info "updating external submodules..."
-    git submodule update --init --recursive
-    _success "updated external submodules !"
     mkdir -p build
     cd build || _error "mkdir failed"
-    cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
-    # INFO: Epitech's moulinette does: `cmake --build .` but this is slow as fuc
-    if make -j"$(nproc)" zappy_ai; then
-        _success "compiled zappy_ai"
-        exit 0
+    cmake .. -G "Unix Makefiles" $cmake_args
+    if ! make -j"$(nproc)" zappy_ai; then
+        _error "compilation error" "failed to compile zappy_ai"
     fi
-    _error "compilation error" "failed to compile zappy_ai"
+    _success "compiled zappy_ai"
+}
+
+function _all()
+{
+    _base_run "-DCMAKE_BUILD_TYPE=Release -DZAP_AI_ENABLE_DEBUG=OFF"
+    exit 0
 }
 
 function _debug()
 {
-    if ! { command -v cmake > /dev/null; } 2>&1; then
-        _error "command 'cmake' not found" "please install 'cmake' or 'nix develop' 🤓"
-    fi
-    _success "command 'cmake' found, building..."
-    _info "updating external submodules..."
-    git submodule update --init --recursive
-    _success "updated external submodules !"
-    mkdir -p build
-    cd build || _error "mkdir failed"
-    cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DZAP_AI_ENABLE_DEBUG=ON
-    # INFO: Epitech's moulinette does: `cmake --build .` but this is slow as fuc
-    if make -j"$(nproc)" zappy_ai; then
-        _success "compiled zappy_ai"
-        exit 0
-    fi
-    _error "compilation error" "failed to compile zappy_ai"
+    _base_run "-DCMAKE_BUILD_TYPE=Debug -DZAP_AI_ENABLE_DEBUG=ON"
+    exit 0
 }
 
 function _tests_run()
 {
-    if ! { command -v cmake > /dev/null; } 2>&1; then
-        _error "command 'cmake' not found" "please install 'cmake' or 'nix develop' 🤓"
-    fi
-    _success "command 'cmake' found, building..."
-    mkdir -p build
-    cd build || _error "mkdir failed"
-    cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
-    if ! make -j"$(nproc)" zap_srv_unit_tests; then
-        _error "unit tests compilation error" "failed to compile zap_srv_unit_tests"
-    fi
-    cd .. || _error "cd failed"
-    if ! ./zap_srv_unit_tests; then
-        _error "unit tests error" "unit tests failed!"
-    fi
-    _success "unit tests succeed!"
-    if [ "$(uname -s)" == 'Darwin' ]; then
-        xcrun llvm-profdata merge -sparse zap_srv_unit_tests-*.profraw -o zap_srv_unit_tests.profdata
-        xcrun llvm-cov report ./zap_srv_unit_tests -instr-profile=zap_srv_unit_tests.profdata -ignore-filename-regex='.*/tests/.*' -enable-name-compression > code_coverage.txt
-    else
-        gcovr -r . --exclude tests/ > code_coverage.txt
-    fi
-    cat code_coverage.txt
+    _info "no unit tests found, please run ./build.sh to build the project."
+    exit 0
 }
 
 function _clean()
 {
     rm -rf build
-    external/lib-cextend/build.sh -c
 }
 
 function _fclean()
 {
     _clean
-    rm -rf zappy_ai unit_tests plugins code_coverage.txt unit_tests-*.profraw unit_tests.profdata vgcore* cmake-build-debug libs/*
-    external/lib-cextend/build.sh -f
+    rm -rf zappy_ai unit_tests plugins code_coverage.txt unit_tests-*.profraw unit_tests.profdata vgcore* cmake-build-debug
 }
 
 for args in "$@"
@@ -114,7 +81,7 @@ ARGUMENTS:
       $0 [-d|--debug]   debug flags compilation
       $0 [-c|--clean]   clean the project
       $0 [-f|--fclean]  fclean the project
-      $0 [-t|--tests]   run unit tests
+      $0 [-t|--tests]   run unit tests ⚠️ not implemented yet ⚠️
 EOF
         exit 0
         ;;
@@ -131,7 +98,6 @@ EOF
         ;;
     -t|--tests)
         _tests_run
-        exit 0
         ;;
     -r|--re)
         _fclean
