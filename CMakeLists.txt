@@ -1,3 +1,10 @@
+##
+## EPITECH PROJECT, 2025
+## Zappy-AI
+## File description:
+## CMakeLists.txt
+##
+
 cmake_minimum_required(VERSION 3.16)
 project(zappy_ai VERSION 1.0)
 
@@ -6,6 +13,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 
 ########################################
 # INFO: enable multithreading for build
@@ -32,6 +40,9 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         "${CMAKE_CURRENT_SOURCE_DIR}/src/exec/get_linux_path.c")
 endif()
 
+########################################
+# NOTE: Zappy AI client
+########################################
 add_executable(zappy_ai
     ${MAIN_SOURCE}
     ${PATH_SOURCE}
@@ -79,41 +90,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 ########################################
-
+# NOTE: debug
+########################################
 option(ZAP_AI_ENABLE_DEBUG "Enable debug definition" OFF)
 
-########################################
-
-file(GLOB TEST_SOURCE
-    "tests/*.c")
-
-add_executable(unit_tests
-    ${TEST_SOURCE}
-    ${MAIN_SOURCE}
-    ${PATH_SOURCE}
-)
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
-    target_compile_options(unit_tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(unit_tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(unit_tests PRIVATE -fprofile-arcs -ftest-coverage)
-    target_link_options(unit_tests PRIVATE -fprofile-arcs -ftest-coverage)
+if(ENABLE_DEBUG)
+    target_compile_definitions(zappy_gui PRIVATE DEBUG=1)
 endif()
-
-target_compile_definitions(unit_tests PRIVATE UNIT_TESTS=1)
-
-target_link_libraries(unit_tests PRIVATE criterion)
-
-target_include_directories(unit_tests PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-)
-
-enable_testing()
-add_test(NAME unit_tests COMMAND unit_tests)
-
-add_custom_target(tests_run
-    COMMAND unit_tests
-    DEPENDS unit_tests
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
