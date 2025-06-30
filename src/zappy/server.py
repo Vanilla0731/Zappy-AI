@@ -127,6 +127,10 @@ class ZappyServer:
             return
 
         # 3. Check if the message is relevant to us
+        logger.debug(f"Check value Name :")
+        logger.debug(f"valueBase : {team_name} tested value : {state.team_name}")
+        logger.debug(f"Purpose : Incantation == {purpose}")
+        logger.debug(f"state level : {state.level} tested value : {required_level}")
         if team_name == state.team_name and purpose == "Incantation" and state.level == required_level:
             logger.debug(f"Decision: Responding to incantation call for level {required_level} from direction {direction}.")
             state.is_responding_to_broadcast = True

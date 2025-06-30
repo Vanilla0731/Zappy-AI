@@ -201,12 +201,12 @@ class DecisionEngine(ZappyServer, PlayerState):
         Make decisions based on the current state of the AI.
         This method should be implemented with the AI's logic.
         """
-        actions = [self._respond_to_broadcast,
-                   self._update_vision,
+        actions = [self._update_vision,
                    self._survive,
-                   self._reproduct,
                    self._elevate,
+                   self._respond_to_broadcast,
                    self._gather,
+                   self._reproduct,
                    self._explore]
 
         any(action() for action in actions)
