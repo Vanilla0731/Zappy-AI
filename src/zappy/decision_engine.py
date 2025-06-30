@@ -159,6 +159,13 @@ class DecisionEngine(ZappyServer, PlayerState):
                 self.send_command(f"Broadcast {message}")
                 # Looking around while waiting for more players
                 self.send_command("Look")
+                # self.send_command("Right")
+                # self.send_command("Look")
+                # self.send_command("Left")
+                # self.send_command("Left")
+                # self.send_command("Look")
+                # self.send_command("Right")
+                # self.send_command("Look")
             return True
         return False
 
@@ -204,9 +211,9 @@ class DecisionEngine(ZappyServer, PlayerState):
         actions = [self._update_vision,
                    self._survive,
                    self._elevate,
+                   self._reproduct,
                    self._respond_to_broadcast,
                    self._gather,
-                   self._reproduct,
                    self._explore]
 
         any(action() for action in actions)
